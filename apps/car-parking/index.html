@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Car Parking Finder</title>
+  <link rel="stylesheet" href="../../shared/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="../../shared/style.css" />
+</head>
+<body>
+  <div class="map-app">
+    <aside class="panel">
+      <div class="panel-head">
+        <div class="title-row">
+          <h1>Car Parking Finder</h1>
+          <a class="back" href="../../">← All apps</a>
+        </div>
+
+        <form class="row" id="searchForm">
+          <input type="search" id="place" placeholder="Where are you going?" aria-label="Destination" />
+          <button type="submit">Go</button>
+          <button type="button" id="locate" title="Use my location">📍</button>
+        </form>
+        <div class="muted small">Or tap the map to set your destination.</div>
+
+        <div class="chips">
+          <label class="chip"><input type="checkbox" id="fFree" /><span class="dot" style="background:#1f9d55"></span>Free only</label>
+          <label class="chip"><input type="checkbox" id="fPublic" checked />Hide private</label>
+          <label class="chip"><input type="checkbox" id="fStreet" checked />Street parking</label>
+        </div>
+        <div class="row small">
+          <label>Within
+            <select id="radius">
+              <option value="300">300 m</option>
+              <option value="600" selected>600 m</option>
+              <option value="1000">1 km</option>
+              <option value="2000">2 km</option>
+            </select>
+          </label>
+          <label>Sort
+            <select id="sort">
+              <option value="dist">Closest</option>
+              <option value="free">Free first</option>
+              <option value="size">Biggest</option>
+            </select>
+          </label>
+        </div>
+        <div class="chips small muted">
+          <span><span class="dot" style="background:#1f9d55"></span> Free</span>
+          <span><span class="dot" style="background:#d64545"></span> Paid</span>
+          <span><span class="dot" style="background:#8a94a6"></span> Unknown</span>
+        </div>
+
+        <div class="status" id="status">Search for a destination or tap the map.</div>
+      </div>
+      <div class="list" id="list"></div>
+    </aside>
+    <div class="map-wrap"><div id="map"></div></div>
+  </div>
+
+  <script src="../../shared/vendor/leaflet/leaflet.js"></script>
+  <script src="../../shared/map-utils.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

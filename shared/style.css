@@ -1,0 +1,174 @@
+/* Shared look for all J&E apps. Colors are tokens so light/dark both work. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --text: #16181d;
+  --muted: #5c6370;
+  --border: #dde1e7;
+  --accent: #2f6fed;
+  --accent-text: #ffffff;
+  --ok: #1f9d55;
+  --warn: #c27c0e;
+  --bad: #d64545;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111317;
+    --surface: #1a1d23;
+    --surface-2: #23272f;
+    --text: #e8eaee;
+    --muted: #9aa2ae;
+    --border: #2e333c;
+    --accent: #5b8cff;
+    --accent-text: #0b0d10;
+    --ok: #3ccf7e;
+    --warn: #f0b04a;
+    --bad: #ff6b6b;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--accent); }
+h1, h2, h3 { line-height: 1.2; margin: 0; }
+
+button, .btn {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 12px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button:hover, .btn:hover { background: var(--surface-2); }
+button.primary, .btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+button.primary:hover { filter: brightness(1.08); }
+button:disabled { opacity: 0.55; cursor: default; }
+
+input, select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  min-width: 0;
+}
+
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+/* ---------- Map app layout (truck stops + car parking) ---------- */
+.map-app {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  height: 100dvh;
+}
+.map-app .panel {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.map-app .panel-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+}
+.map-app .panel-head .title-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.map-app .panel-head h1 { font-size: 18px; }
+.map-app .back { font-size: 13px; text-decoration: none; }
+.map-app .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.map-app .row > input[type="search"] { flex: 1; }
+.map-app .status { font-size: 13px; color: var(--muted); min-height: 1.2em; }
+.map-app .status.error { color: var(--bad); }
+.map-app .list { overflow-y: auto; flex: 1; padding: 6px 0; }
+.map-app .item {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+}
+.map-app .item:hover { background: var(--surface-2); }
+.map-app .item .name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.map-app .item .meta { font-size: 13px; color: var(--muted); }
+.map-app #map { height: 100%; width: 100%; }
+
+.dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  display: inline-block; flex: none;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--surface);
+  cursor: pointer;
+  user-select: none;
+}
+.chip input { margin: 0; }
+.tag {
+  font-size: 12px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.card-box {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+
+/* Leaflet popups follow the theme */
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: var(--surface); color: var(--text);
+}
+.leaflet-popup-content { font: 14px/1.4 system-ui, sans-serif; }
+.leaflet-popup-content b { font-size: 15px; }
+
+/* Phone: map on top, list below */
+@media (max-width: 760px) {
+  .map-app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 50dvh 1fr;
+    height: 100dvh;
+  }
+  .map-app .map-wrap { order: -1; }
+  .map-app .panel { border-right: none; border-top: 1px solid var(--border); }
+}

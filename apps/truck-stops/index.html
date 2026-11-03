@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Truck Stop Map</title>
+  <link rel="stylesheet" href="../../shared/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="../../shared/style.css" />
+</head>
+<body>
+  <div class="map-app">
+    <aside class="panel">
+      <div class="panel-head">
+        <div class="title-row">
+          <h1>Truck Stop Map</h1>
+          <a class="back" href="../../">← All apps</a>
+        </div>
+
+        <form class="row" id="searchForm">
+          <input type="search" id="place" placeholder="Go to a place (e.g. Jönköping)" aria-label="Place" />
+          <button type="submit">Go</button>
+          <button type="button" id="locate" title="Use my location">📍</button>
+        </form>
+
+        <button class="primary" id="find">Find truck stops in this area</button>
+
+        <div class="chips" id="filters"></div>
+
+        <div class="card-box">
+          <b>Break planner</b>
+          <div class="row small">
+            <label>Driving since <input type="time" id="since" /></label>
+            <label>Avg speed <input type="number" id="speed" value="75" min="20" max="100" style="width:64px" /> km/h</label>
+          </div>
+          <div id="breakInfo" class="small"></div>
+          <label class="small row"><input type="checkbox" id="showRange" checked /> Show how far I can drive before the break</label>
+          <div class="muted small">EU rule: 45 min break after 4 h 30 min of driving (can be split 15 + 30). Max 9 h driving per day (10 h twice a week).</div>
+        </div>
+
+        <div class="status" id="status">Zoom to an area and press “Find truck stops”.</div>
+      </div>
+      <div class="list" id="list"></div>
+    </aside>
+    <div class="map-wrap"><div id="map"></div></div>
+  </div>
+
+  <script src="../../shared/vendor/leaflet/leaflet.js"></script>
+  <script src="../../shared/map-utils.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
