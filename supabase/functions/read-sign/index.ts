@@ -24,6 +24,7 @@ const SignReading = z.object({
   rules: z.array(
     z.object({
       when: z.string().describe("Days and times this rule applies, e.g. 'Mon-Fri 08-18', 'Sat 10-15', 'always'. Swedish signs: plain numbers = weekdays, (parentheses) = Saturdays/day before holiday, red numbers = Sundays/holidays."),
+      hours: z.string().nullable().describe("The same days and times in OpenStreetMap opening_hours syntax, always with days, e.g. 'Mo-Fr 08:00-18:00', 'Sa 10:00-15:00', 'Su,PH 10:00-15:00', '24/7'. Null if unclear."),
       parking_allowed: z.boolean(),
       max_stay_minutes: z.number().int().nullable(),
       fee: z.enum(["free", "paid", "unknown"]),
@@ -31,6 +32,7 @@ const SignReading = z.object({
     }),
   ),
   street_cleaning: z.string().nullable().describe("Datumparkering / street cleaning times if shown, else null"),
+  street_cleaning_hours: z.string().nullable().describe("Street cleaning (no parking) times in OpenStreetMap opening_hours syntax, e.g. 'Th 00:00-06:00'. Null if none or if it depends on dates (datumparkering)."),
   confidence: z.enum(["high", "medium", "low"]),
 });
 

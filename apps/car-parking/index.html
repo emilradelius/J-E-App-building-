@@ -3,15 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Car Parking Finder</title>
+  <title>Park for Free</title>
   <link rel="stylesheet" href="../../shared/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="../../shared/style.css" />
   <style>
-    .chance { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .big-btn { justify-content: center; padding: 11px 14px; font-size: 16px; width: 100%; }
+    .verdict { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: #fff; white-space: nowrap; }
+    .chance { font-size: 12px; font-weight: 700; white-space: nowrap; }
     .item .name { justify-content: space-between; }
     .item .name > span:first-child { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .item .badges { display: flex; gap: 6px; align-items: center; flex: none; }
     .sheet { display: grid; gap: 10px; }
-    .sheet[hidden] { display: none; }
+    .sheet[hidden], [hidden] { display: none !important; }
     .types { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .types label { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font-size: 13px; cursor: pointer; background: var(--surface); }
     .types input { margin: 0; }
@@ -25,6 +29,28 @@
     .crosshair::before { left: 12px; top: 0; width: 2px; height: 26px; }
     .crosshair::after { top: 12px; left: 0; height: 2px; width: 26px; }
     .map-wrap { position: relative; }
+
+    /* "Can I park here?" answer */
+    .answer { border-left: 5px solid var(--muted); }
+    .answer .headline { font-size: 17px; font-weight: 700; }
+    .answer .row button { padding: 5px 10px; font-size: 13px; }
+
+    /* Area chance + best time */
+    .area .headline { font-size: 15px; }
+    .area .big { font-size: 22px; font-weight: 800; }
+    .bands { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+    .bands b { color: var(--text); }
+    .bars { display: grid; grid-template-columns: repeat(18, 1fr); gap: 2px; align-items: end; height: 46px; }
+    .bars button { padding: 0; border: none; border-radius: 3px 3px 0 0; min-height: 3px; cursor: pointer; opacity: .8; }
+    .bars button.now { opacity: 1; outline: 2px solid var(--text); outline-offset: 1px; }
+    .bar-labels { display: grid; grid-template-columns: repeat(6, 1fr); font-size: 11px; color: var(--muted); }
+    .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+    .legend span { display: inline-flex; align-items: center; gap: 4px; }
+
+    @media (max-width: 760px) {
+      .map-app .panel { overflow-y: auto; }
+      .map-app .list { overflow: visible; flex: none; }
+    }
   </style>
 </head>
 <body>
@@ -32,28 +58,36 @@
     <aside class="panel">
       <div class="panel-head">
         <div class="title-row">
-          <h1>Car Parking Finder</h1>
+          <div>
+            <h1>Park for Free</h1>
+            <div class="subtitle">Where can I park for free, and will there be a space?</div>
+          </div>
           <a class="back" href="../../">← All apps</a>
         </div>
 
         <!-- Search view -->
         <div id="searchView" class="sheet">
+          <button type="button" class="primary big-btn" id="hereBtn">📍 Can I park here?</button>
           <form class="row" id="searchForm">
-            <input type="search" id="place" placeholder="Where are you going?" aria-label="Destination" />
+            <input type="search" id="place" placeholder="…or where are you going?" aria-label="Destination" />
             <button type="submit">Go</button>
-            <button type="button" id="locate" title="Use my location" aria-label="Use my location">📍</button>
           </form>
           <div class="row small">
             <label>Arriving <input type="datetime-local" id="when" /></label>
             <button type="button" id="now">Now</button>
           </div>
-          <div class="chips">
-            <label class="chip"><input type="checkbox" id="fFree" /><span class="dot" style="background:#1f9d55"></span>Free only</label>
-            <label class="chip"><input type="checkbox" id="fPublic" checked />Hide private</label>
-            <label class="chip"><input type="checkbox" id="fStreet" checked />Street parking</label>
-            <label class="chip"><input type="checkbox" id="fReports" checked />Reports</label>
-          </div>
           <div class="row small">
+            <label>Staying
+              <select id="stay">
+                <option value="30">30 min</option>
+                <option value="60">1 h</option>
+                <option value="120" selected>2 h</option>
+                <option value="180">3 h</option>
+                <option value="240">4 h</option>
+                <option value="480">Work day (8 h)</option>
+                <option value="720">Overnight (12 h)</option>
+              </select>
+            </label>
             <label>Within
               <select id="radius">
                 <option value="300">300 m</option>
@@ -61,17 +95,28 @@
                 <option value="1000">1 km</option>
               </select>
             </label>
+          </div>
+
+          <div class="card-box answer" id="answer" hidden></div>
+          <div class="card-box area" id="area" hidden></div>
+
+          <div class="chips">
+            <label class="chip"><input type="checkbox" id="fPaid" />Show paid too</label>
+            <label class="chip"><input type="checkbox" id="fNo" />Show not allowed</label>
+            <label class="chip"><input type="checkbox" id="fStreet" checked />Street parking</label>
+            <label class="chip"><input type="checkbox" id="fReports" checked />Reports</label>
+          </div>
+          <div class="row small">
             <label>Sort
               <select id="sort">
-                <option value="chance">Best chance</option>
+                <option value="best">Free + best chance</option>
                 <option value="dist">Closest</option>
-                <option value="free">Free first</option>
               </select>
             </label>
-            <button type="button" id="reportBtn">＋ Report</button>
+            <button type="button" id="reportBtn">📷 Add sign / report</button>
           </div>
-          <div class="status" id="status">Search for a destination or tap the map.</div>
-          <div class="estimate-note">Chance = estimate from time of day, day of week and parking type, adjusted by what people report. Tap a spot to report “found a spot” or “full”.</div>
+          <div class="legend" id="legend"></div>
+          <div class="status" id="status">Tap “Can I park here?”, search a place, or tap the map.</div>
         </div>
 
         <!-- Report view -->
@@ -87,7 +132,7 @@
             <button type="submit" class="primary" id="saveReport">Save report</button>
             <button type="button" id="cancelReport">Cancel</button>
           </div>
-          <div class="muted small">Reports are shared with everyone using the app. Road-sign photos are read automatically by AI.</div>
+          <div class="muted small">Reports are shared with everyone using the app. Sign photos are read by AI and become the rules for that street, so the next driver doesn't need to check.</div>
         </form>
       </div>
       <div class="list" id="list"></div>
@@ -98,6 +143,8 @@
   <script src="../../shared/vendor/leaflet/leaflet.js"></script>
   <script src="../../shared/map-utils.js"></script>
   <script src="../../shared/supabase-config.js"></script>
+  <script src="schedule.js"></script>
+  <script src="rules.js"></script>
   <script src="model.js"></script>
   <script src="reports.js"></script>
   <script src="app.js"></script>
