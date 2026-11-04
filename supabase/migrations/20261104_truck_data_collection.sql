@@ -110,6 +110,7 @@ create extension if not exists pg_net;
 -- the header is the public one from shared/supabase-config.js.
 --   truck-data-autobahn-daily      '17 3 * * *'    body {"source":"autobahn"}
 --   truck-data-trafikverket-10min  '*/10 * * * *'  body {"source":"trafikverket"}  (no-op until the key is set)
+--   truck-data-nvdb-daily          '37 3 * * *'    body {"source":"nvdb"}
 -- select cron.schedule('<name>', '<schedule>', $$ select net.http_post(
 --   url := 'https://ugageqklogrispkncrnp.supabase.co/functions/v1/collect-truck-data',
 --   headers := '{"Content-Type":"application/json","Authorization":"Bearer <anon key>"}'::jsonb,

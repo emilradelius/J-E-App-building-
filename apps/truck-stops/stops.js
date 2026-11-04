@@ -33,6 +33,10 @@
     if (t.fee === "no") f.push("free of charge");
     if (t.opening_hours === "24/7") f.push("24/7");
     if (t.maxstay) f.push("max stay " + t.maxstay);
+    if (t._overnight) f.push("official overnight truck rest place");
+    if (t._wifi) f.push("wifi");
+    if (t._power) f.push("power for trucks");
+    if (t._adr) f.push("ADR parking");
     if (t._hotel) f.push("hotel");
     if (t._docstop) f.push("DocStop (doctor for drivers)");
     if (t._sensors) f.push("space sensors");
@@ -176,7 +180,9 @@ out center tags 3000;`;
   const SITE_FEATURES = [
     [/toilet|wc/i, "_toilets"], [/restaurant|raststätte|imbiss|gastst|kiosk|café|cafe|food/i, "_food"],
     [/dusch|shower/i, "shower"], [/überwach|bewach|video|secur|guard|polizei/i, "supervised"],
-    [/hotel|motel/i, "_hotel"], [/docstop/i, "_docstop"], [/parkplatzdetektion|telematik-parken/i, "_sensors"],
+    [/hotel|motel/i, "_hotel"], [/docstop/i, "_docstop"], [/parkplatzdetektion|telematik-parken|space sensors/i, "_sensors"],
+    [/camera|kamera/i, "surveillance"], [/^guarded/i, "supervised"], [/døgnhvileplass|overnight truck rest/i, "_overnight"],
+    [/wifi|wlan|internett/i, "_wifi"], [/power for trucks/i, "_power"], [/dangerous goods/i, "_adr"],
   ];
   function mergeSites(places, sites, locate) {
     const out = places.slice();
@@ -225,6 +231,7 @@ out center tags 3000;`;
         if (kind === "rest" && c.type === "fuel") score -= 2; // a fuel station is a poor place to sleep
         if (kind === "rest" && WANTS.secure.has(c.tags)) score += 1;
         if (c.closed) score -= 20;
+        if (kind === "rest" && c.tags._overnight) score += 1.5; // built for the daily rest
         return { ...c, arrival, chance, matched, missing, detour, score };
       })
       .sort((a, b) => b.score - a.score);

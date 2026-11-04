@@ -30,6 +30,8 @@ Drivers            ──► "🟢 spaces / 🟡 a few / 🔴 full" + planned st
 | Source | Data | Status |
 |---|---|---|
 | **Autobahn GmbH API** (Germany) — `verkehr.autobahn.de/o/autobahn/{road}/services/parking_lorry` ([API spec](https://github.com/bundesAPI/autobahn-api/blob/main/openapi.yaml)) | **1,825 truck parking sites on 113 motorways, 46,739 truck spaces**: showers, restaurants, hotels, DocStop, police, closed flag, and which sites have space sensors | ✅ Imported. Refreshes daily at 03:17 |
+| **Statens vegvesen NVDB API Les v4** (Norway): types 809 "døgnhvileplass" and 39 "rasteplass" ([NVDB API](https://nvdbapiles.atlas.vegvesen.no/)) | **643 places, 2,964 truck spaces**: 64 official overnight truck rest places, plus 579 rest areas with truck spaces. Includes toilets, showers, kiosk/café, Wi-Fi, cameras, guards, lighting, fuel, truck power, ADR, booking and space-sensor flags | ✅ Imported. Refreshes daily at 03:37. Overnight places are preferred for night rests |
+| **Check-ins** ("📍 Check in where I'm parked") | GPS-confirmed: the driver is within 500 m, then says free/few/full. Also lets drivers add **new** truck parking spots | ✅ In the app. Counted as *verified* (double weight) once migration `20261104_truck_checkins.sql` is approved |
 | OpenStreetMap (Overpass) | Truck stops, rest areas, hgv parking, fuel, restaurants, toilets, showers in all of Europe | ✅ Live in the app for each route |
 | Driver reports | free / few / full | ✅ Shared table on |
 | Planned stops | Who will be where, when | ✅ On |
@@ -44,7 +46,6 @@ These are the **best live sources**, but they need a person to register. Once th
 | 1 | **Trafikverket open API** (Sweden) | ~215 rest areas (Parking object), roadworks, accidents, road weather, live traffic flow, ferry status | Free key at [Trafiklab](https://www.trafiklab.se/api/trafiklab-apis/trafikverket/) or [Trafikverket](https://www.trafikverket.se/e-tjanster/hamta-data-fran-trafikverket/) | Our home market. The collector is **already written and scheduled every 10 min**; it only needs the secret `TRAFIKVERKET_API_KEY` |
 | 2 | **Toll Collect SID** via Mobilithek (Germany) | **Live truck parking occupancy for every German motorway rest area, updated every minute** (counts, % and free/almost full/full), from truck toll GPS + sensors. Live since 2 June 2026 | Free registration with Toll Collect + a Mobilithek account ([BMV](https://www.bmv.de/SharedDocs/DE/Artikel/K/lkw-stellplatzinformationsdienst-sid.html), [SID data & registration (PDF)](https://company.toll-collect.de/static/media/dokumente/sid/sid-data-and-registration-en.pdf), [Toll Collect SID overview](https://company.toll-collect.de/static/media/dokumente/sid/sid-overview-en.pdf)) | **The biggest single win.** Germany is where Swedish long-haul drivers struggle most to find parking. Format: DATEX II v2 (ParkingTablePublication + ParkingStatusPublication) |
 | 3 | **Tankerkönig** (Germany) | Live diesel price at every German fuel station (MTS-K, CC BY 4.0) | Free key at creativecommons.tankerkoenig.de ([info](https://creativecommons.tankerkoenig.de)) | "Cheapest diesel on your route" through Germany |
-| 4 | Statens vegvesen NVDB (Norway) | Rest areas (type 39) and truck overnight places (type 809) | No key needed ([data.norge.no](https://data.norge.no/en/datasets/542d8ed0-e944-418b-b10e-6411d68fd5e2)) | Norway coverage. I can add this next without anyone signing up |
 | 5 | Digitraffic (Finland) | Road weather (350+ stations), roadworks, traffic. CC BY 4.0 ([service overview](https://www.digitraffic.fi/en/service-overview/)) | No key | Finland routes. No truck parking found |
 | 6 | Flanders (Belgium) DATEX II truck parkings | Static truck parking ([transportdata.be](https://transportdata.be/dataset/?page=4)) | Open | Belgium coverage |
 | 7 | Czech motorway truck parking | Real-time occupancy as open DATEX II ([CDV](https://cdv.gov.cz/en/provision-of-traffic-information-in-real-time-on-ten-t-network-parking-areas-for-heavy-vehicles-on-czech-motorway-network)) | Check registration | Live data for drivers going south-east |
@@ -72,9 +73,9 @@ You asked me to scrape everything. I didn't scrape these, because the legal risk
 
 1. 🔑 **Emil/Jacob: get a Trafikverket key** → I add it as a secret, and Swedish rest areas start flowing within 10 minutes.
 2. 🔑 **Emil/Jacob: register for Toll Collect SID + Mobilithek** → I write the DATEX II reader, and live German occupancy fills `truck_site_status` every 5–10 minutes.
-3. Me: add **Norway NVDB** rest areas and overnight places (no key).
+3. ✅ Done: Norway NVDB rest areas and overnight places.
 4. 🔑 Tankerkönig key → cheapest diesel along the route in Germany.
-5. Me: a "Check in" button at the stop, so a GPS-verified "I'm here" adds a free data point every time a driver parks.
+5. ✅ Done: "Check in" button. **Needs approval:** the check-ins migration (marks GPS-confirmed reports as verified).
 6. When `truck_site_status` has a few weeks of German data, check how good our time-of-day estimate is and tune it.
 
 ## Small technical notes

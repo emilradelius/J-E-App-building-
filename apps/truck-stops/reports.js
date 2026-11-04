@@ -41,10 +41,16 @@ window.TruckReports = (() => {
     }
   }
 
-  async function add(place, status) {
+  // extra = { verified: true, distance_m } for a GPS-confirmed check-in
+  async function add(place, status, extra = {}) {
     const row = { place_id: place.id, status, lat: place.lat, lon: place.lon };
     try {
-      await post("truck_parking_reports", row);
+      if (extra.verified) {
+        try { await post("truck_parking_reports", { ...row, verified: true, distance_m: Math.round(extra.distance_m) }); }
+        catch { await post("truck_parking_reports", row); } // database not upgraded for check-ins yet
+      } else {
+        await post("truck_parking_reports", row);
+      }
       local.add({ ...row, created_at: new Date().toISOString() });
       shared = true;
       return { shared: true };

@@ -7,6 +7,9 @@
 //  - autobahn:     Autobahn GmbH (Germany) — every truck parking area on the
 //                  motorways, with truck space count, facilities, and closed flag.
 //                  Free, no key. https://verkehr.autobahn.de/o/autobahn
+//  - nvdb:         Statens vegvesen NVDB (Norway), API Les v4 — official truck
+//                  overnight rest places ("døgnhvileplass", type 809) and rest
+//                  areas with truck spaces ("rasteplass", type 39). Free, no key.
 //  - trafikverket: Trafikverket (Sweden) open API, object type "Parking"
 //                  (rest areas). Needs secret TRAFIKVERKET_API_KEY (free from
 //                  Trafiklab). Skipped until the key is set.
@@ -17,18 +20,18 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 // Don't let anyone hammer the sources: minimum minutes between runs per source.
-const MIN_GAP_MIN: Record<string, number> = { autobahn: 6 * 60, trafikverket: 10 };
+const MIN_GAP_MIN: Record<string, number> = { autobahn: 6 * 60, nvdb: 6 * 60, trafikverket: 10 };
 
 Deno.serve(async (req) => {
   let body: { source?: string } = {};
   try { body = await req.json(); } catch { /* no body */ }
-  const sources = body.source && body.source !== "all" ? [body.source] : ["autobahn", "trafikverket"];
+  const sources = body.source && body.source !== "all" ? [body.source] : ["autobahn", "nvdb", "trafikverket"];
   const results: Record<string, unknown> = {};
   for (const s of sources) {
     try {
       if (!(s in MIN_GAP_MIN)) { results[s] = "unknown source"; continue; }
       if (await ranRecently(s)) { results[s] = "skipped (ran recently)"; continue; }
-      results[s] = s === "autobahn" ? await autobahn() : await trafikverket();
+      results[s] = s === "autobahn" ? await autobahn() : s === "nvdb" ? await nvdb() : await trafikverket();
     } catch (e) {
       results[s] = "error: " + (e as Error).message;
       await log(s, false, (e as Error).message, null);
@@ -94,6 +97,85 @@ async function autobahn() {
   }
   const note = `${roads.length} roads, ${rows.length} truck parking sites, ${failed} roads failed`;
   await log("autobahn", true, note, { roads, count: rows.length });
+  return note;
+}
+
+// ---------------- Statens vegvesen NVDB (Norway) ----------------
+// API Les v4. Geometry with srid=4326 comes as "lat lon" (not lon lat!).
+const NVDB = "https://nvdbapiles.atlas.vegvesen.no/vegobjekter/api/v4/vegobjekter";
+const NVDB_HEADERS = { Accept: "application/json", "X-Client": "JE-truck-break-planner" };
+
+// Yes/no properties → English feature names the app understands
+const NVDB_FEATURES: [string, string][] = [
+  ["Toalett", "Toilet"], ["Dusj", "Shower"], ["Kiosk", "Kiosk"], ["Kafeteria", "Cafeteria"],
+  ["Oppholdsrom", "Lounge"], ["Trådløst internett", "Wifi"], ["Drivstoffyllingsanlegg", "Fuel"],
+  ["Tilgang til strøm", "Power for trucks"], ["Vaskeplass for trailere", "Truck wash"],
+  ["Kameraovervåkning", "Camera surveillance"], ["Belysning", "Lighting"], ["Stengt med bommer", "Barrier gate"],
+  ["Reserveringssystem", "Booking system"], ["System som melder tilgjengelig kapasitet", "Space sensors"],
+  ["Tilrettelagt for modulvogntog", "Fits long modular trucks"], ["Snøryddingsrampe", "Snow-clearing ramp"],
+];
+
+async function nvdbAll(type: number) {
+  const out: any[] = [];
+  let url = `${NVDB}/${type}?inkluder=egenskaper,geometri,lokasjon&srid=4326&antall=1000`;
+  for (let page = 0; page < 50 && url; page++) {
+    const j = await getJson(url, { headers: NVDB_HEADERS });
+    const objs = j?.objekter || [];
+    out.push(...objs);
+    const next = j?.metadata?.neste?.href;
+    url = objs.length && next ? next : "";
+  }
+  return out;
+}
+
+function centroidLatLon(wkt: string) {
+  const nums = (wkt.replace(/^[A-Z ]+\(+/i, "").match(/-?\d+(\.\d+)?/g) || []).map(Number);
+  const dims = /\bZ\b/i.test(wkt.split("(")[0]) ? 3 : 2;
+  let lat = 0, lon = 0, n = 0;
+  for (let i = 0; i + 1 < nums.length; i += dims) { lat += nums[i]; lon += nums[i + 1]; n++; }
+  return n ? { lat: lat / n, lon: lon / n } : null;
+}
+
+function nvdbRow(o: any, kind: "overnight" | "rest") {
+  const props: Record<string, any> = {};
+  for (const e of o.egenskaper || []) if (e.egenskapstype !== "Geometri") props[e.navn] = e.verdi;
+  const c = centroidLatLon(o.geometri?.wkt || "");
+  if (!c || c.lat < 55 || c.lat > 72) return null;
+  const trucks = kind === "overnight" ? props["Antall oppstillingsplasser vogntog"] : props["Antall oppstillingspl. store kjt."];
+  if (kind === "rest" && !(trucks > 0)) return null; // rest areas without truck spaces are no use to us
+  const features: string[] = kind === "overnight" ? ["Official overnight truck rest place (døgnhvileplass)"] : [];
+  for (const [no, en] of NVDB_FEATURES) if (props[no] === "Ja" || (typeof props[no] === "string" && props[no].startsWith("Ja"))) features.push(en);
+  if (props["Vaktordning"] && !/ingen/i.test(props["Vaktordning"])) features.push("Guarded (" + props["Vaktordning"] + ")");
+  if (props["Farlig gods"] && !/ikke/i.test(props["Farlig gods"])) features.push("Dangerous goods parking");
+  if (props["Lokalisert ved"]) features.push("At: " + props["Lokalisert ved"]);
+  const ref = o.lokasjon?.vegsystemreferanser?.[0]?.kortform || null;
+  return {
+    id: `nvdb:${o.id}`,
+    source: "nvdb",
+    name: props["Navn"] || (kind === "overnight" ? "Døgnhvileplass" : "Rasteplass"),
+    lat: c.lat, lon: c.lon,
+    country: "NO",
+    road: ref,
+    capacity_hgv: typeof trucks === "number" ? trucks : null,
+    features,
+    is_blocked: false,
+    raw: { type: kind, props, lokasjon: o.lokasjon },
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function nvdb() {
+  const [overnight, rest] = await Promise.all([nvdbAll(809), nvdbAll(39)]);
+  const rows = [
+    ...overnight.map((o) => nvdbRow(o, "overnight")),
+    ...rest.map((o) => nvdbRow(o, "rest")),
+  ].filter(Boolean) as any[];
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await db.from("truck_sites").upsert(rows.slice(i, i + 500));
+    if (error) throw new Error("save failed: " + error.message);
+  }
+  const note = `${overnight.length} døgnhvileplasser, ${rest.length} rasteplasser (${rows.length} with truck spaces saved)`;
+  await log("nvdb", true, note, { overnight: overnight.length, rest: rest.length, saved: rows.length });
   return note;
 }
 

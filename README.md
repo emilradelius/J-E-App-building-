@@ -55,7 +55,8 @@ The Truck Break Planner uses:
 - `planned_stops`: anonymous planned stops, so it can show "N drivers plan to stop here then".
 - `truck_sites` and `truck_site_status`: official truck parking sites and live occupancy.
 - `truck_fullness_by_hour`: a view of how full each place usually is.
-- Edge Function `collect-truck-data`: fills `truck_sites` from Autobahn GmbH (daily) and Trafikverket (every 10 min, once the secret `TRAFIKVERKET_API_KEY` is set). pg_cron runs it.
+- Edge Function `collect-truck-data`: fills `truck_sites` from Autobahn GmbH in Germany (daily), Statens vegvesen NVDB in Norway (daily) and Trafikverket (every 10 min, once the secret `TRAFIKVERKET_API_KEY` is set). pg_cron runs it.
+- "📍 Check in where I'm parked": GPS-confirmed reports (within 500 m). They're stored as `verified` once `20261104_truck_checkins.sql` is applied.
 
 All data sources, and the ones waiting for a sign-up, are listed in `docs/research/truck-data-sources.md`.
 
