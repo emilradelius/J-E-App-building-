@@ -75,7 +75,7 @@ window.Reports = (() => {
     },
 
     async checkinsNear(b) {
-      return (await rest(`parking_checkins?select=spot,found,created_at&${bboxFilter(b)}&created_at=gte.${since(180)}&limit=5000`))
+      return (await rest(`parking_checkins?select=spot,found,lat,lon,created_at&${bboxFilter(b)}&created_at=gte.${since(180)}&limit=5000`))
         .map((c) => ({ ...c, at: c.created_at }));
     },
 
