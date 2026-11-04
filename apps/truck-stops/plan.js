@@ -98,10 +98,15 @@ async function planTrip(e) {
     setStatus(`Route ${Math.round(route.km)} km. Looking for truck stops along it…`);
     const places = await stopsAlongRoute(route, thinPts);
 
-    setStatus("Checking driver reports…");
-    const reports = await TruckReports.list(routeBounds(route));
+    setStatus("Checking driver reports and live data…");
+    const bounds = routeBounds(route);
+    const [reports, ctx] = await Promise.all([TruckReports.list(bounds), TruckReports.context(bounds)]);
+    const merged = Stops.mergeSites(places, ctx.sites, (p) => RouteUtils.locateOnRoute(thinPts, p));
+    const ids = [...new Set(merged.flatMap((p) => [p.id, ...(p.siteIds || [])]))];
+    ctx.fullness = await TruckReports.fullness(ids);
+    ctx.reports = reports;
 
-    trip = { from, to, route, thinPts, places, reports, departAt: new Date($("depart").value || Date.now()) };
+    trip = { from, to, route, thinPts, places: merged, reports, ctx, departAt: new Date($("depart").value || Date.now()) };
     overrides = new Map();
     recompute(true);
     setStatus("");
@@ -140,7 +145,7 @@ function routeBounds(route) {
 // Step through the trip: drive until the next required stop, pick the best
 // truck stop shortly before that moment, stop there, repeat.
 function computePlan() {
-  const { route, places, reports } = trip;
+  const { route, places } = trip;
   const total = route.minutes;
   let st = Rules.initialState(driverState());
   let cur = 0; // route minute where we are
@@ -163,7 +168,7 @@ function computePlan() {
     let lo = ns.maxDrive < 15 ? cur : Math.max(cur + 10, limit - winLen);
     let cands = pick(lo);
     if (!cands.length) { lo = Math.max(cur + 5, limit - winLen * 2.5); cands = pick(lo); }
-    const ranked = Stops.rank(cands, { win: [lo, limit], kind: ns.kind, wants: want, arrivalAt, reports });
+    const ranked = Stops.rank(cands, { win: [lo, limit], kind: ns.kind, wants: want, arrivalAt, ctx: trip.ctx });
 
     const idx = stops.length;
     const chosen = (overrides.has(idx) && ranked.find((r) => r.id === overrides.get(idx))) || ranked[0] || null;
@@ -248,8 +253,8 @@ function render(fit) {
       <div>Arrive about <b>${fmtTime(plan.arrive)}</b></div>
       <div class="muted small">${route.truckAware ? `Truck-safe route for ${num("height")} m / ${num("weight")} t${$("hazmat").checked ? " / ADR" : ""}` : "Car route (not truck-checked)"} · no live traffic</div>
       ${warnings.map((w) => `<div class="warn">⚠️ ${esc(w)}</div>`).join("")}
-      <a class="btn primary" target="_blank" rel="noopener" href="${esc(googleLink())}">Open in Google Maps with my stops</a>
-      <div class="muted small">Google Maps isn't truck-aware. Follow the blue route above where it differs.</div>
+      <a class="btn primary" id="openGoogle" target="_blank" rel="noopener" href="${esc(googleLink())}">Open in Google Maps with my stops</a>
+      <div class="muted small">Google Maps isn't truck-aware. Follow the blue route above where it differs. Opening it shares your planned stops (place and time only, anonymous) so other drivers see how busy a stop will be.</div>
     </div>`;
 
   // Timeline
@@ -281,6 +286,8 @@ function stopCard(s, i) {
     <div class="meta">${t.label} · km ${Math.round(c.m / 1000)}${c.detour ? ` · ${Math.round(c.detour)} min detour` : ""}${late > 5 ? ` · ${fmtDur(late)} before you must stop` : ""}</div>
     ${c.features.length ? `<div class="meta">${esc(c.features.join(" · "))}${missing}</div>` : missing ? `<div class="meta">${missing.slice(3)}</div>` : ""}
     <div class="meta" title="How we guessed">Chance of a space: ${esc(c.chance.why)}</div>
+    ${c.closed ? `<div class="warn">⚠️ Closed according to the road authority</div>` : ""}
+    ${c.sources && c.sources.length > 1 ? `<div class="meta">Data: ${esc(c.sources.join(" + "))}</div>` : ""}
     ${s.alts.length > 1 ? `<div class="alts">${alts}</div>` : ""}
     <div class="report">Here now? <button type="button" data-report="${i}|free">🟢 Spaces</button><button type="button" data-report="${i}|few">🟡 A few</button><button type="button" data-report="${i}|full">🔴 Full</button>
       <a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lon}" target="_blank" rel="noopener">Navigate</a>
@@ -314,14 +321,20 @@ async function onReport(spec) {
   if (!s || !s.chosen) return;
   const res = await TruckReports.add(s.chosen, status);
   setStatus(res.shared ? "Thanks! Other drivers will see your report." : "Saved on this phone (sharing isn't switched on yet).");
-  trip.reports = await TruckReports.list(routeBounds(trip.route));
+  trip.reports = trip.ctx.reports = await TruckReports.list(routeBounds(trip.route));
   recompute();
 }
 // Leaflet stops clicks inside popups from bubbling, so wire popup buttons directly.
 map.on("popupopen", (e) => {
   e.popup.getElement().querySelectorAll("[data-choose]").forEach((b) => (b.onclick = () => onChoose(b.dataset.choose)));
 });
+let sharedPlanKey = null;
 document.addEventListener("click", (e) => {
+  if (e.target.closest("#openGoogle") && plan) {
+    // The driver is going with this plan: tell other drivers (anonymously) where we'll stop.
+    const key = plan.stops.map((s) => (s.chosen ? s.chosen.id : "-") + "@" + Math.round(s.arrive / 6e5)).join();
+    if (key !== sharedPlanKey) { sharedPlanKey = key; TruckReports.addPlanned(plan.stops); }
+  }
   const c = e.target.closest("[data-choose]");
   if (c) return onChoose(c.dataset.choose);
   const r = e.target.closest("[data-report]");

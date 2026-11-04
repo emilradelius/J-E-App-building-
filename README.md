@@ -50,7 +50,14 @@ The Car Parking Finder stores shared reports, check-ins and photos in the Supaba
 - Storage bucket `report-photos` (public, images up to 2 MB).
 - Edge Function `read-sign` (`supabase/functions/read-sign/`) reads road-sign photos with Claude. It needs the secret `ANTHROPIC_API_KEY` (Supabase dashboard → Edge Functions → Secrets).
 
-The Truck Break Planner uses table `truck_parking_reports` (drivers say "spaces / a few / full"). Its SQL is in `supabase/migrations/20261104_truck_parking_reports.sql`. Until it's applied, reports stay on the driver's phone.
+The Truck Break Planner uses:
+- `truck_parking_reports`: drivers say "spaces / a few / full".
+- `planned_stops`: anonymous planned stops, so it can show "N drivers plan to stop here then".
+- `truck_sites` and `truck_site_status`: official truck parking sites and live occupancy.
+- `truck_fullness_by_hour`: a view of how full each place usually is.
+- Edge Function `collect-truck-data`: fills `truck_sites` from Autobahn GmbH (daily) and Trafikverket (every 10 min, once the secret `TRAFIKVERKET_API_KEY` is set). pg_cron runs it.
+
+All data sources, and the ones waiting for a sign-up, are listed in `docs/research/truck-data-sources.md`.
 
 Tests for the EU driving-time rules: `node apps/truck-stops/rules.test.js`.
 

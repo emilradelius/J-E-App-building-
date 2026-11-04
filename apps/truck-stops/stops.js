@@ -33,6 +33,9 @@
     if (t.fee === "no") f.push("free of charge");
     if (t.opening_hours === "24/7") f.push("24/7");
     if (t.maxstay) f.push("max stay " + t.maxstay);
+    if (t._hotel) f.push("hotel");
+    if (t._docstop) f.push("DocStop (doctor for drivers)");
+    if (t._sensors) f.push("space sensors");
     return f;
   }
 
@@ -98,41 +101,105 @@ out center tags 3000;`;
     return 0.5; // 05–06
   }
 
-  // reports: [{ place_id, status: free|few|full, created_at }]
-  function chanceOfSpace(place, arrival, reports) {
+  // ctx = { reports, planned, live, fullness } — see reports.js. Any part may be empty.
+  //   reports:  [{ place_id, status: free|few|full, created_at }]
+  //   planned:  [{ place_id, arrive_at, leave_at }]   other drivers' planned stops
+  //   live:     [{ site_id, status, occupied, capacity, observed_at }]  official live feeds
+  //   fullness: [{ site_id, dow (1=Mon), hour, n, fullness 0..1 }]     history
+  function chanceOfSpace(place, arrival, ctx = {}) {
+    const ids = new Set([place.id, ...(place.siteIds || [])]);
+    const now = Date.now();
+    const soon = arrival - now < 3 * 3600e3;
     let p = hourPrior(arrival.getHours());
     const cap = parseInt(place.tags["capacity:hgv"] || place.tags.capacity || "", 10);
     if (cap >= 50) p += 0.1;
     else if (cap && cap < 10) p -= 0.1;
     if (place.type === "services") p += 0.05;
-    let why = "estimate from time of day" + (cap ? ` and ${cap} spaces` : "");
+    const why = ["time of day" + (cap ? `, ${cap} spaces` : "")];
 
-    const mine = (reports || []).filter((r) => r.place_id === place.id);
-    const val = { free: 0.9, few: 0.45, full: 0.05 };
-    // Reports from the last 2 hours say most about "now" — only useful if we arrive soon.
-    const soon = arrival - Date.now() < 3 * 3600e3;
-    const recent = mine.filter((r) => Date.now() - new Date(r.created_at) < 2 * 3600e3);
-    if (soon && recent.length) {
-      const r = recent[0];
-      p = val[r.status];
-      why = `driver reported "${r.status}" ${Math.round((Date.now() - new Date(r.created_at)) / 60000)} min ago`;
+    // 1. History: how full is it usually on this weekday at this hour?
+    const dow = ((arrival.getDay() + 6) % 7) + 1, h = arrival.getHours();
+    const hist = (ctx.fullness || []).filter((f) => ids.has(f.site_id) && f.dow === dow && Math.abs(f.hour - h) <= 1);
+    const histN = hist.reduce((s, f) => s + f.n, 0);
+    if (histN) {
+      const avgFull = hist.reduce((s, f) => s + f.fullness * f.n, 0) / histN;
+      const w = Math.min(0.85, histN * 0.1);
+      p = p * (1 - w) + (1 - avgFull) * w;
+      why.push(`${histN} past reading${histN > 1 ? "s" : ""} for ${["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][dow]} ~${h}:00`);
+    }
+
+    // 2. Other drivers who plan to be there at the same time take spaces.
+    const others = (ctx.planned || []).filter((x) => ids.has(x.place_id) && new Date(x.arrive_at) <= arrival.getTime() + 3600e3 && new Date(x.leave_at) >= arrival);
+    if (others.length) {
+      p -= Math.min(0.3, others.length * (cap ? 1 / Math.max(cap, 5) : 0.04));
+      why.push(`${others.length} other driver${others.length > 1 ? "s plan" : " plans"} to stop here then`);
+    }
+
+    // 3. Live now (only matters if we arrive within ~3 h)
+    if (soon) {
+      const val = { free: 0.9, few: 0.45, full: 0.05 };
+      const live = (ctx.live || []).find((l) => ids.has(l.site_id) && now - new Date(l.observed_at) < 30 * 60e3);
+      const rep = (ctx.reports || []).find((r) => ids.has(r.place_id) && now - new Date(r.created_at) < 2 * 3600e3);
+      const hoursAhead = Math.max(0, (arrival - now) / 3600e3);
+      const keep = Math.max(0.3, 1 - hoursAhead / 3); // the further ahead, the less "now" tells us
+      if (live && (live.capacity > 0 || val[live.status] != null)) {
+        const lp = live.capacity > 0 && live.occupied != null ? 1 - Math.min(1, live.occupied / live.capacity) : val[live.status];
+        p = lp * keep + p * (1 - keep);
+        why.push(`live: ${live.occupied != null && live.capacity ? `${live.capacity - live.occupied} of ${live.capacity} free` : live.status} ${Math.round((now - new Date(live.observed_at)) / 60000)} min ago`);
+      } else if (rep) {
+        p = val[rep.status] * keep + p * (1 - keep);
+        why.push(`driver said "${rep.status}" ${Math.round((now - new Date(rep.created_at)) / 60000)} min ago`);
+      }
     } else {
-      // Reports at a similar time of day (±2 h) in the last 60 days
-      const h = arrival.getHours();
-      const similar = mine.filter((r) => {
+      // Older driver reports at a similar hour (when there is no history row yet)
+      const val = { free: 0.9, few: 0.45, full: 0.05 };
+      const similar = histN ? [] : (ctx.reports || []).filter((r) => {
+        if (!ids.has(r.place_id)) return false;
         const rh = new Date(r.created_at).getHours();
-        const d = Math.min(Math.abs(rh - h), 24 - Math.abs(rh - h));
-        return d <= 2 && Date.now() - new Date(r.created_at) < 60 * 864e5;
+        return Math.min(Math.abs(rh - h), 24 - Math.abs(rh - h)) <= 2 && now - new Date(r.created_at) < 60 * 864e5;
       });
       if (similar.length) {
         const avg = similar.reduce((s, r) => s + val[r.status], 0) / similar.length;
         const w = Math.min(0.8, similar.length * 0.2);
         p = p * (1 - w) + avg * w;
-        why = `${similar.length} driver report${similar.length > 1 ? "s" : ""} around this time`;
+        why.push(`${similar.length} driver report${similar.length > 1 ? "s" : ""} around this time`);
       }
     }
-    p = Math.min(0.95, Math.max(0.05, p));
-    return { p, label: p >= 0.65 ? "Good" : p >= 0.4 ? "OK" : "Low", why };
+    if (place.closed) { p = 0.02; why.unshift("reported CLOSED by the road authority"); }
+    p = Math.min(0.95, Math.max(0.02, p));
+    return { p, label: p >= 0.65 ? "Good" : p >= 0.4 ? "OK" : "Low", why: why.join(" · ") };
+  }
+
+  // Official sites (truck_sites) → join them to the OpenStreetMap stops.
+  // Matched within 400 m: add capacity/facilities and remember the site id.
+  // Not matched: add as a new truck parking stop.
+  const SITE_FEATURES = [
+    [/toilet|wc/i, "_toilets"], [/restaurant|raststätte|imbiss|gastst|kiosk|café|cafe|food/i, "_food"],
+    [/dusch|shower/i, "shower"], [/überwach|bewach|video|secur|guard|polizei/i, "supervised"],
+    [/hotel|motel/i, "_hotel"], [/docstop/i, "_docstop"], [/parkplatzdetektion|telematik-parken/i, "_sensors"],
+  ];
+  function mergeSites(places, sites, locate) {
+    const out = places.slice();
+    for (const s of sites) {
+      const at = locate(s);
+      if (at.offset > 2500) continue;
+      const tags = {};
+      for (const f of s.features || []) for (const [re, tag] of SITE_FEATURES) if (re.test(f)) tags[tag] = "yes";
+      if (s.capacity_hgv) tags["capacity:hgv"] = String(s.capacity_hgv);
+      const match = out.find((p) => Math.abs(p.lat - s.lat) < 0.005 && Math.abs(p.lon - s.lon) < 0.008 && root.RouteUtils.haversine(p, s) < 400);
+      if (match) {
+        match.siteIds = [...(match.siteIds || []), s.id];
+        for (const [k, v] of Object.entries(tags)) if (!(k in match.tags)) match.tags[k] = v;
+        if (s.is_blocked) match.closed = true;
+        match.sources = [...new Set([...(match.sources || ["OpenStreetMap"]), s.source])];
+        match.features = features(match.tags);
+      } else {
+        const p = { id: s.id, type: "parking", lat: s.lat, lon: s.lon, name: s.name || "Truck parking", tags, siteIds: [s.id], closed: !!s.is_blocked, sources: [s.source], ...at };
+        p.features = features(p.tags);
+        out.push(p);
+      }
+    }
+    return out;
   }
 
   // Detour off the route and back, in minutes (slow roads near the exit).
@@ -141,12 +208,12 @@ out center tags 3000;`;
   // Rank candidates for one stop. `win` = [from, to] in route minutes; later is
   // better (uses the allowed driving time), but a good stop a bit earlier beats
   // a bad one at the limit.
-  function rank(cands, { win, kind, wants, arrivalAt, reports }) {
+  function rank(cands, { win, kind, wants, arrivalAt, ctx }) {
     const span = Math.max(1, win[1] - win[0]);
     return cands
       .map((c) => {
         const arrival = arrivalAt(c.t);
-        const chance = chanceOfSpace(c, arrival, reports);
+        const chance = chanceOfSpace(c, arrival, ctx);
         const matched = wants.filter((w) => WANTS[w].has(c.tags));
         const missing = wants.filter((w) => !WANTS[w].has(c.tags));
         const detour = detourMin(c.offset);
@@ -157,12 +224,13 @@ out center tags 3000;`;
         score -= detour / 5;
         if (kind === "rest" && c.type === "fuel") score -= 2; // a fuel station is a poor place to sleep
         if (kind === "rest" && WANTS.secure.has(c.tags)) score += 1;
+        if (c.closed) score -= 20;
         return { ...c, arrival, chance, matched, missing, detour, score };
       })
       .sort((a, b) => b.score - a.score);
   }
 
-  const api = { TYPES, WANTS, corridorQuery, toPlaces, chanceOfSpace, hourPrior, rank, detourMin, features };
+  const api = { TYPES, WANTS, corridorQuery, toPlaces, chanceOfSpace, hourPrior, rank, detourMin, features, mergeSites };
   root.Stops = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
