@@ -77,6 +77,9 @@ window.IDEAS = [
       "Does Malmö's open data portal have parking zones/prices we can use?",
       "Is paying for busyness data (BestTime.app etc.) worth it before we have users?",
       "Start with Malmö only?",
+      "EasyPark FIND already shows the 'chance of a spot' in Malmö. Do we lead with free/time-limited street rules (the gap) instead? See docs/research/parking-competitors.md",
+      "Partner or compete? Nofine (Swedish sign-reader) has an API; payment apps (Parkster, Mobill) might want our free-parking rule data.",
+      "How do we keep crowd-sourced rules trustworthy (SpotAngels gets accuracy complaints)? E.g. 'confirmed by 3 drivers, last seen 5 days ago'.",
     ],
     nextSteps: [
       "Test v1 in Malmö: is the loading OK now, and do the chance labels feel right?",
@@ -84,6 +87,7 @@ window.IDEAS = [
       "Email Transportstyrelsen about RDT access",
     ],
     log: [
+      { date: "2026-11-04", who: "Claude", text: "Competitor research: no app does all of it, but EasyPark FIND already predicts spots in Malmö and several Swedish apps read signs; the gap is a shared photo-built map of free/time-limited street rules (docs/research/parking-competitors.md)." },
       { date: "2026-11-04", who: "Claude", text: "Supabase project je-apps: shared reports, check-ins, photos + AI sign reader (Edge Function read-sign)." },
       { date: "2026-11-04", who: "Claude", text: "v1: faster/more reliable loading, arrival time, chance estimate, check-ins, photo reports (saved on the phone for now)." },
       { date: "2026-11-04", who: "Emil", text: "Feedback: slow + error in Malmö; wants time-of-day stats, area activity, road signs, user photos." },
