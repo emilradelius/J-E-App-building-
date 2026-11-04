@@ -37,12 +37,18 @@ window.IDEAS = [
       "Confirm driving-time rules per region (EU 561/2006 vs. other countries)",
       "Phone app (driver in cab) or also web for dispatchers?",
       "Do we talk to real truck drivers first to see what they actually miss?",
+      "Competitor research done (docs/research/trucking-competitors.md): build a break + parking planner that hands off to Google Maps/Sygic, instead of our own truck sat-nav?",
+      "Where do we get live parking availability in Sweden? (Trafikverket has almost none yet; LKW.APP uses toll data; our own driver check-ins?)",
+      "Can we use Trafikverket open data (NVDB bridge heights/weights, live traffic, rest areas) for free in the app?",
+      "Read the tachograph / driver card later, or let the driver type remaining hours for now?",
+      "Show the official EU secure-parking level (eu-parkings.eu) for each stop?",
     ],
     nextSteps: [
       "Try the v0 map and write down what feels missing",
       "Pick a truck-routing provider and check prices",
     ],
     log: [
+      { date: "2026-11-04", who: "Claude", text: "Competitor research: the pieces exist (Garmin, Sygic, LKW.APP, Trucker Path in the US), but no EU phone app plans breaks + free parking along the route. Gap: Nordic, driver-first, EU rules." },
       { date: "2026-11-03", who: "Claude", text: "Built v0: map of truck stops + break timer + range circle." },
       { date: "2026-11-03", who: "Emil & Jacob", text: "Idea discussed in evening session." },
     ],
