@@ -3,36 +3,99 @@
 //   - Overpass API  -> places on the map (parking, truck stops…)
 //   - Nominatim     -> turn a typed place name into coordinates
 window.MapUtils = (() => {
+  // Several free Overpass servers. We ask the first one, and if it hasn't
+  // answered within a couple of seconds we also ask the next, and take
+  // whichever answers first. Results are cached for 30 minutes.
   const OVERPASS_SERVERS = [
     "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   ];
+  const CACHE_MS = 30 * 60 * 1000;
 
-  async function overpass(query) {
-    let lastErr;
-    for (const url of OVERPASS_SERVERS) {
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          body: "data=" + encodeURIComponent(query),
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        });
-        if (!res.ok) throw new Error("Map data server answered " + res.status);
-        return (await res.json()).elements || [];
-      } catch (e) {
-        lastErr = e;
-      }
+  function cacheGet(key) {
+    try {
+      const hit = JSON.parse(localStorage.getItem(key) || "null");
+      return hit && Date.now() - hit.t < CACHE_MS ? hit.v : null;
+    } catch { return null; }
+  }
+  function cacheSet(key, v) {
+    try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), v })); } catch { /* storage full: skip cache */ }
+  }
+  function hash(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return "ovp:" + h;
+  }
+
+  async function overpass(query, { timeoutMs = 20000, staggerMs = 2500 } = {}) {
+    const key = hash(query);
+    const cached = cacheGet(key);
+    if (cached) return cached;
+
+    let done = false;
+    const controllers = [];
+    const attempt = (url, delay) =>
+      new Promise((resolve, reject) => {
+        setTimeout(async () => {
+          if (done) return reject(new Error("cancelled"));
+          const ctrl = new AbortController();
+          controllers.push(ctrl);
+          const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+          try {
+            const res = await fetch(url, {
+              method: "POST",
+              body: "data=" + encodeURIComponent(query),
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              signal: ctrl.signal,
+            });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const json = await res.json();
+            if (json.remark && /error|timed out|out of memory/i.test(json.remark)) throw new Error(json.remark);
+            resolve(json.elements || []);
+          } catch (e) {
+            reject(e);
+          } finally {
+            clearTimeout(timer);
+          }
+        }, delay);
+      });
+
+    // Start with the server that answered last time.
+    let order = OVERPASS_SERVERS;
+    try {
+      const fav = localStorage.getItem("ovp:fastest");
+      if (fav && OVERPASS_SERVERS.includes(fav)) order = [fav, ...OVERPASS_SERVERS.filter((u) => u !== fav)];
+    } catch {}
+
+    try {
+      const elements = await Promise.any(
+        order.map((u, i) => attempt(u, i * staggerMs).then((els) => {
+          try { localStorage.setItem("ovp:fastest", u); } catch {}
+          return els;
+        }))
+      );
+      done = true;
+      controllers.forEach((c) => c.abort());
+      cacheSet(key, elements);
+      return elements;
+    } catch {
+      done = true;
+      throw new Error("The free map-data servers are busy right now. Wait a moment and try again.");
     }
-    throw lastErr || new Error("Could not load map data");
   }
 
   async function geocode(text) {
+    const cached = cacheGet("geo:" + text.toLowerCase());
+    if (cached) return cached;
     const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(text);
     const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Search failed (" + res.status + ")");
+    if (!res.ok) throw new Error("Place search failed (" + res.status + "). Try again, or tap the map instead.");
     const [hit] = await res.json();
     if (!hit) throw new Error("No place found for “" + text + "”");
-    return { lat: +hit.lat, lon: +hit.lon, label: hit.display_name };
+    const out = { lat: +hit.lat, lon: +hit.lon, label: hit.display_name };
+    cacheSet("geo:" + text.toLowerCase(), out);
+    return out;
   }
 
   // Distance in metres between two {lat, lon} points
