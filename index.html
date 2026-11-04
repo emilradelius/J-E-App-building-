@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>J&amp;E App Tracker</title>
+  <link rel="stylesheet" href="shared/style.css" />
+  <style>
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+    header { display: grid; gap: 6px; margin-bottom: 20px; }
+    header h1 { font-size: 26px; }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .stage {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      cursor: pointer;
+      text-align: left;
+      display: grid;
+      gap: 2px;
+    }
+    .stage .n { font-size: 24px; font-weight: 700; }
+    .stage .l { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .stage.active { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+    .toolbar input { flex: 1; min-width: 180px; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+    .card-top { display: flex; justify-content: space-between; align-items: start; gap: 10px; }
+    .card h2 { font-size: 17px; }
+    .badge {
+      font-size: 12px; font-weight: 600;
+      padding: 2px 9px; border-radius: 999px;
+      white-space: nowrap;
+      border: 1px solid currentColor;
+    }
+    .summary { color: var(--muted); font-size: 14px; margin: 0; }
+    .progress { display: grid; gap: 4px; }
+    .bar { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+    .progress .small { display: flex; justify-content: space-between; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    details { border-top: 1px solid var(--border); padding-top: 8px; }
+    summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+    details h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 4px; }
+    details ul { margin: 0; padding-left: 18px; font-size: 14px; }
+    details li { margin: 2px 0; }
+    ul.checks { list-style: none; padding-left: 0; }
+    ul.checks li::before { content: "○ "; color: var(--muted); }
+    ul.checks li.done::before { content: "● "; color: var(--ok); }
+    ul.checks li.done { color: var(--muted); }
+    .log li { list-style: none; margin-left: -18px; }
+    .log .d { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .empty { color: var(--muted); padding: 30px 0; text-align: center; }
+    footer { margin-top: 30px; font-size: 13px; color: var(--muted); }
+    code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+    @media (max-width: 760px) {
+      .pipeline { grid-template-columns: repeat(3, 1fr); }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>J&amp;E App Tracker</h1>
+      <div class="muted" id="headline"></div>
+    </header>
+
+    <div class="pipeline" id="pipeline"></div>
+
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search ideas…" aria-label="Search ideas" />
+      <select id="sort" aria-label="Sort">
+        <option value="priority">Sort: priority</option>
+        <option value="progress">Sort: progress</option>
+        <option value="updated">Sort: last updated</option>
+        <option value="name">Sort: name</option>
+      </select>
+      <button id="clear">Show all</button>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <footer>
+      To add an idea or update progress, edit <code>data/ideas.js</code> (or ask Claude to do it) and push.
+      Every change is saved in the Git history, so you can always see who changed what.
+    </footer>
+  </div>
+
+  <script src="data/ideas.js"></script>
+  <script>
+    const STAGES = [
+      { key: "idea", label: "Idea", color: "#8a94a6" },
+      { key: "exploring", label: "Exploring", color: "#a06ee0" },
+      { key: "building", label: "Building", color: "#2f6fed" },
+      { key: "testing", label: "Testing", color: "#c27c0e" },
+      { key: "live", label: "Live", color: "#1f9d55" },
+      { key: "parked", label: "Parked", color: "#9aa2ae" },
+    ];
+    const stageOf = (k) => STAGES.find((s) => s.key === k) || STAGES[0];
+    const ideas = (window.IDEAS || []).map((i) => {
+      const f = i.features || [];
+      const done = f.filter((x) => x.done).length;
+      return {
+        ...i,
+        done,
+        total: f.length,
+        pct: f.length ? Math.round((done / f.length) * 100) : 0,
+        updated: (i.log && i.log[0] && i.log[0].date) || "",
+      };
+    });
+
+    let filterStage = null;
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    function renderPipeline() {
+      $("pipeline").innerHTML = STAGES.map((s) => {
+        const n = ideas.filter((i) => i.status === s.key).length;
+        return `<button class="stage ${filterStage === s.key ? "active" : ""}" data-stage="${s.key}">
+          <span class="n">${n}</span>
+          <span class="l"><span class="dot" style="background:${s.color}"></span>${s.label}</span>
+        </button>`;
+      }).join("");
+      const active = ideas.filter((i) => ["building", "testing"].includes(i.status)).length;
+      $("headline").textContent = `${ideas.length} ideas · ${active} in progress · ${ideas.filter((i) => i.status === "live").length} live`;
+    }
+
+    function card(i) {
+      const s = stageOf(i.status);
+      const list = (arr, cls = "") => (arr && arr.length ? `<ul class="${cls}">${arr.join("")}</ul>` : `<div class="muted small">—</div>`);
+      return `<article class="card">
+        <div class="card-top">
+          <h2>${esc(i.name)}</h2>
+          <span class="badge" style="color:${s.color}">${s.label}</span>
+        </div>
+        <p class="summary">${esc(i.summary)}</p>
+        ${i.total ? `<div class="progress">
+          <div class="bar"><span style="width:${i.pct}%"></span></div>
+          <div class="small muted"><span>${i.done} of ${i.total} features</span><span>${i.pct}%</span></div>
+        </div>` : ""}
+        <div class="small muted">Priority ${i.priority || "–"}${i.owner ? " · " + esc(i.owner) : ""}${i.updated ? " · updated " + i.updated : ""}</div>
+        ${i.app ? `<div class="actions"><a class="btn primary" href="${esc(i.app)}">Open app →</a></div>` : ""}
+        <details>
+          <summary>Details</summary>
+          <h3>Features</h3>
+          ${list((i.features || []).map((f) => `<li class="${f.done ? "done" : ""}">${esc(f.text)}</li>`), "checks")}
+          <h3>Open questions</h3>
+          ${list((i.openQuestions || []).map((q) => `<li>${esc(q)}</li>`))}
+          <h3>Next steps</h3>
+          ${list((i.nextSteps || []).map((q) => `<li>${esc(q)}</li>`))}
+          <h3>Log</h3>
+          ${list((i.log || []).map((l) => `<li><span class="d">${esc(l.date)}</span> <b>${esc(l.who)}</b>: ${esc(l.text)}</li>`), "log")}
+        </details>
+      </article>`;
+    }
+
+    function renderGrid() {
+      const q = $("q").value.trim().toLowerCase();
+      const sort = $("sort").value;
+      let list = ideas.filter((i) => !filterStage || i.status === filterStage);
+      if (q) list = list.filter((i) => JSON.stringify(i).toLowerCase().includes(q));
+      const order = STAGES.map((s) => s.key);
+      list.sort((a, b) => {
+        if (sort === "progress") return b.pct - a.pct;
+        if (sort === "updated") return b.updated.localeCompare(a.updated);
+        if (sort === "name") return a.name.localeCompare(b.name);
+        // priority, then parked last, then pipeline order
+        return (a.status === "parked") - (b.status === "parked") || (a.priority || 9) - (b.priority || 9) || order.indexOf(b.status) - order.indexOf(a.status);
+      });
+      $("grid").innerHTML = list.length ? list.map(card).join("") : `<div class="empty">No ideas match.</div>`;
+    }
+
+    function render() { renderPipeline(); renderGrid(); }
+
+    $("pipeline").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-stage]");
+      if (!b) return;
+      filterStage = filterStage === b.dataset.stage ? null : b.dataset.stage;
+      render();
+    });
+    $("q").addEventListener("input", renderGrid);
+    $("sort").addEventListener("change", renderGrid);
+    $("clear").addEventListener("click", () => { filterStage = null; $("q").value = ""; render(); });
+    render();
+  </script>
+</body>
+</html>
