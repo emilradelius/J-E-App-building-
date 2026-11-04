@@ -84,10 +84,10 @@
           </label>
           <textarea id="note" placeholder="What does it say? e.g. “Parking 8–18 max 2h, Thursdays 0–6 street cleaning”"></textarea>
           <div class="row">
-            <button type="submit" class="primary">Save report</button>
+            <button type="submit" class="primary" id="saveReport">Save report</button>
             <button type="button" id="cancelReport">Cancel</button>
           </div>
-          <div class="muted small">Reports are only saved on this phone for now. Sharing them with every user needs a server (next step).</div>
+          <div class="muted small">Reports are shared with everyone using the app. Road-sign photos are read automatically by AI.</div>
         </form>
       </div>
       <div class="list" id="list"></div>
@@ -97,6 +97,7 @@
 
   <script src="../../shared/vendor/leaflet/leaflet.js"></script>
   <script src="../../shared/map-utils.js"></script>
+  <script src="../../shared/supabase-config.js"></script>
   <script src="model.js"></script>
   <script src="reports.js"></script>
   <script src="app.js"></script>

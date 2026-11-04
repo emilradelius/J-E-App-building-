@@ -26,7 +26,7 @@ const map = baseMap("map", [55.6050, 13.0007], 15); // Malmö centre
 const spotLayer = L.layerGroup().addTo(map);
 const reportLayer = L.layerGroup().addTo(map);
 let dest = null, destMarker = null, radiusCircle = null;
-let lots = [], streets = [];
+let lots = [], streets = [], checkins = [];
 let loadId = 0;
 
 const $ = (id) => document.getElementById(id);
@@ -125,10 +125,14 @@ function parseStreet(el) {
 }
 
 // ---------- Load (car parks first, street parking second) ----------
-function bboxAround(p, metres) {
+function boundsAround(p, metres) {
   const dLat = metres / 111320;
   const dLon = metres / (111320 * Math.cos((p.lat * Math.PI) / 180));
-  return [p.lat - dLat, p.lon - dLon, p.lat + dLat, p.lon + dLon].map((n) => n.toFixed(5)).join(",");
+  return { s: p.lat - dLat, w: p.lon - dLon, n: p.lat + dLat, e: p.lon + dLon };
+}
+function bboxAround(p, metres) {
+  const b = boundsAround(p, metres);
+  return [b.s, b.w, b.n, b.e].map((n) => n.toFixed(5)).join(",");
 }
 
 async function load() {
@@ -140,6 +144,11 @@ async function load() {
   render();
   setStatus("Looking for car parks…");
   const started = Date.now();
+
+  // Shared check-ins from all users, loaded alongside the map data.
+  store.checkinsNear(boundsAround(dest, +$("radius").value + 150))
+    .then((c) => { if (myLoad === loadId) { checkins = c; render(); } })
+    .catch(() => {});
 
   const lotQuery = `[out:json][timeout:20];nwr["amenity"="parking"](${bb});out center tags 400;`;
   const streetQuery = `[out:json][timeout:20];way["highway"][~"${STREET_KEYS}"~"${STREET_VALUES}"](${bb});out geom tags 400;`;
@@ -172,9 +181,8 @@ async function render(extraStatus) {
   const when = arrival();
   const maxDist = +$("radius").value;
   const sort = $("sort").value;
-  const allCheckins = await store.allCheckins();
   const byspot = {};
-  for (const c of allCheckins) (byspot[c.spot] ||= []).push(c);
+  for (const c of checkins) (byspot[c.spot] ||= []).push(c);
 
   shown = [...lots, ...streets]
     .map((s) => ({ ...s, dist: distance(dest, s), chance: estimate(s, when, byspot[s.id]) }))
@@ -236,8 +244,8 @@ function popupHtml(s) {
     (s.restricted ? `<br><span style="color:var(--warn)">Restricted access${s.access ? " (" + esc(s.access) + ")" : ""}</span>` : "") +
     (s.details.length ? `<br>${esc(s.details.join(" · "))}` : "") +
     `<div class="popup-actions">
-      <button data-checkin="found" data-spot="${esc(s.id)}">✅ Found a spot</button>
-      <button data-checkin="full" data-spot="${esc(s.id)}">⛔ It was full</button>
+      <button data-checkin="found" data-spot="${esc(s.id)}" data-lat="${s.lat}" data-lon="${s.lon}">✅ Found a spot</button>
+      <button data-checkin="full" data-spot="${esc(s.id)}" data-lat="${s.lat}" data-lon="${s.lon}">⛔ It was full</button>
     </div>` +
     `<a href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}" target="_blank" rel="noopener">Navigate</a>` +
     ` · <a href="https://www.openstreetmap.org/${s.id}" target="_blank" rel="noopener">Map data</a>`
@@ -252,10 +260,16 @@ document.addEventListener(
     if (!b) return;
     e.preventDefault();
     e.stopPropagation();
-    await store.addCheckin(b.dataset.spot, b.dataset.checkin === "found");
+    const found = b.dataset.checkin === "found";
     map.closePopup();
-    await render();
-    setStatus("Thanks! Your report improves the estimate for this place and time.");
+    try {
+      await store.addCheckin(b.dataset.spot, found, +b.dataset.lat, +b.dataset.lon);
+      checkins.push({ spot: b.dataset.spot, found, at: new Date().toISOString() });
+      await render();
+      setStatus("Thanks! Shared with everyone. It improves the estimate for this place and time.");
+    } catch (err) {
+      setStatus(err.message, true);
+    }
   },
   true
 );
@@ -276,16 +290,43 @@ function timeAgo(iso) {
   return h < 48 ? h + " h ago" : Math.round(h / 24) + " days ago";
 }
 
+function readingHtml(r) {
+  const x = r.sign_reading;
+  if (!x) return r.type === "sign" && r.photo ? `<br><i class="muted">Sign not read by AI yet.</i>` : "";
+  if (!x.is_parking_sign) return `<br><i class="muted">AI: this doesn't look like a parking sign.</i>`;
+  const rules = (x.rules || [])
+    .map((u) => `<li>${esc(u.when)}: ${u.parking_allowed ? "parking OK" : "no parking"}${u.max_stay_minutes ? `, max ${u.max_stay_minutes >= 60 ? u.max_stay_minutes / 60 + " h" : u.max_stay_minutes + " min"}` : ""}${u.fee !== "unknown" ? ", " + u.fee : ""}${u.requires ? ", needs " + esc(u.requires) : ""}</li>`)
+    .join("");
+  return `<div style="margin-top:6px"><b>AI reading</b> <span class="muted">(${esc(x.confidence)} confidence)</span><br>${esc(x.summary_en)}` +
+    (rules ? `<ul style="margin:4px 0;padding-left:18px">${rules}</ul>` : "") +
+    (x.street_cleaning ? `Street cleaning: ${esc(x.street_cleaning)}` : "") + `</div>`;
+}
+
+let reportTimer = null;
+function scheduleReports() {
+  clearTimeout(reportTimer);
+  reportTimer = setTimeout(renderReports, 400);
+}
+
 async function renderReports() {
+  if (!$("fReports").checked) { reportLayer.clearLayers(); return; }
+  const b = map.getBounds();
+  let reports;
+  try {
+    reports = await store.listReports({ s: b.getSouth(), w: b.getWest(), n: b.getNorth(), e: b.getEast() });
+  } catch {
+    return; // reports are a bonus; the map still works without them
+  }
   reportLayer.clearLayers();
-  if (!$("fReports").checked) return;
-  for (const r of await store.listReports()) {
+  for (const r of reports) {
     const t = REPORT_TYPES[r.type] || REPORT_TYPES.sign;
     L.marker([r.lat, r.lon], { icon: L.divIcon({ className: "", html: `<span style="display:grid;place-items:center;width:22px;height:22px;border-radius:5px;background:${t.color};color:#fff;font:700 13px system-ui;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)">!</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }) })
       .bindPopup(
         `<b style="color:${t.color}">${t.label}</b><br><span class="muted">${timeAgo(r.at)}</span>` +
           (r.note ? `<br>${esc(r.note)}` : "") +
-          (r.photo ? `<img class="popup-photo" src="${r.photo}" alt="Report photo">` : "")
+          readingHtml(r) +
+          (r.photo ? `<a href="${r.photo}" target="_blank" rel="noopener"><img class="popup-photo" src="${r.photo}" alt="Report photo"></a>` : ""),
+        { maxWidth: 260 }
       )
       .addTo(reportLayer);
   }
@@ -309,20 +350,32 @@ $("reportView").addEventListener("submit", async (e) => {
   const c = map.getCenter();
   const file = $("photo").files[0];
   try {
+    const type = new FormData($("reportView")).get("rtype");
+    $("saveReport").disabled = true;
+    $("saveReport").textContent = file ? "Uploading photo…" : "Saving…";
     const photo = file ? await shrinkPhoto(file) : null;
-    await store.addReport({
-      type: new FormData($("reportView")).get("rtype"),
-      lat: c.lat,
-      lon: c.lng,
-      note: $("note").value.trim(),
-      photo,
-    });
+    const row = await store.addReport({ type, lat: c.lat, lon: c.lng, note: $("note").value.trim(), photo });
     openReport(false);
     $("fReports").checked = true;
     await renderReports();
-    setStatus("Report saved.");
+    if (type === "sign" && photo) {
+      setStatus("Report shared. Reading the sign with AI…");
+      try {
+        const reading = await store.readSign(row.id);
+        await renderReports();
+        setStatus(reading && reading.is_parking_sign ? "Sign read: " + reading.summary_en : "Report shared. The AI couldn't find a parking sign in the photo.");
+      } catch (err) {
+        setStatus("Report shared. " + err.message);
+      }
+    } else {
+      setStatus("Report shared with everyone.");
+    }
   } catch (err) {
-    alert(err.message);
+    setStatus(err.message, true);
+    openReport(false);
+  } finally {
+    $("saveReport").disabled = false;
+    $("saveReport").textContent = "Save report";
   }
 });
 
@@ -366,6 +419,7 @@ map.on("click", (e) => {
 $("radius").addEventListener("change", () => dest && setDest(dest));
 ["fFree", "fPublic", "fStreet", "sort", "when"].forEach((id) => $(id).addEventListener("change", () => render()));
 $("fReports").addEventListener("change", renderReports);
+map.on("moveend", () => { if ($("reportView").hidden) scheduleReports(); });
 $("now").addEventListener("click", () => { setNow(); render(); });
 
 setNow();
