@@ -41,3 +41,12 @@ You can also just tell Claude: *"mark route planning as done on the truck app"*.
 - **Navigate links:** open Google Maps directions.
 
 These free servers have usage limits. They're fine for testing. A real launch would need a paid provider or our own server.
+
+## Shared data (Supabase)
+
+The Car Parking Finder stores shared reports, check-ins and photos in the Supabase project **je-apps**:
+- Tables `parking_reports` and `parking_checkins` (schema in `supabase/migrations/`). Anyone can read and add rows; nobody can edit or delete through the app.
+- Storage bucket `report-photos` (public, images up to 2 MB).
+- Edge Function `read-sign` (`supabase/functions/read-sign/`) reads road-sign photos with Claude. It needs the secret `ANTHROPIC_API_KEY` (Supabase dashboard → Edge Functions → Secrets).
+
+The public connection keys are in `shared/supabase-config.js`. They are meant to be public; the database rules decide what they can do.
