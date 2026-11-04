@@ -8,7 +8,7 @@ Jacob & Emil's app ideas, plus the apps we build from them.
 |---|---|
 | `index.html` | **App Tracker**: every idea with its status, progress, open questions and log |
 | `data/ideas.js` | The idea list. **Edit this file to update the tracker** |
-| `apps/truck-stops/` | **Truck Stop Map** (v0): truck stops, rest areas, truck parking and fuel on a map, plus a break timer (EU 4.5 h rule) |
+| `apps/truck-stops/` | **Truck Break Planner** (v1): enter a trip and your tachograph times; it plans a truck-safe route, places every EU break and daily rest at a real truck stop, and shows the chance of a free space. `nearby.html` is the old "truck stops near me" map |
 | `apps/car-parking/` | **Car Parking Finder** (v1): car parks and street parking near a destination, chance of a spot for your arrival time, check-ins and photo reports |
 | `shared/` | Shared styles, map helpers and a bundled copy of Leaflet (the map library) |
 
@@ -38,6 +38,7 @@ You can also just tell Claude: *"mark route planning as done on the truck app"*.
 
 - **Places:** [OpenStreetMap](https://www.openstreetmap.org) via the Overpass API. Coverage is good in Sweden and Europe, but it is volunteer-mapped, so some places are missing or have no details.
 - **Place search:** Nominatim (OpenStreetMap).
+- **Truck routes:** Valhalla truck routing on the free FOSSGIS server (OpenStreetMap data: height, weight, width limits, hazmat). Falls back to a normal car route (with a warning) if it's down. No live traffic.
 - **Navigate links:** open Google Maps directions.
 
 These free servers have usage limits. They're fine for testing. A real launch would need a paid provider or our own server.
@@ -48,5 +49,9 @@ The Car Parking Finder stores shared reports, check-ins and photos in the Supaba
 - Tables `parking_reports` and `parking_checkins` (schema in `supabase/migrations/`). Anyone can read and add rows; nobody can edit or delete through the app.
 - Storage bucket `report-photos` (public, images up to 2 MB).
 - Edge Function `read-sign` (`supabase/functions/read-sign/`) reads road-sign photos with Claude. It needs the secret `ANTHROPIC_API_KEY` (Supabase dashboard → Edge Functions → Secrets).
+
+The Truck Break Planner uses table `truck_parking_reports` (drivers say "spaces / a few / full"). Its SQL is in `supabase/migrations/20261104_truck_parking_reports.sql`. Until it's applied, reports stay on the driver's phone.
+
+Tests for the EU driving-time rules: `node apps/truck-stops/rules.test.js`.
 
 The public connection keys are in `shared/supabase-config.js`. They are meant to be public; the database rules decide what they can do.
