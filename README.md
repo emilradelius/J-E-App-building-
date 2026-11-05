@@ -9,7 +9,7 @@ Jacob & Emil's app ideas, plus the apps we build from them.
 | `index.html` | **App Tracker**: every idea with its status, progress, open questions and log |
 | `data/ideas.js` | The idea list. **Edit this file to update the tracker** |
 | `apps/truck-stops/` | **Truck Break Planner** (v1): enter a trip and your tachograph times; it plans a truck-safe route, places every EU break and daily rest at a real truck stop, and shows the chance of a free space. `nearby.html` is the old "truck stops near me" map |
-| `apps/car-parking/` | **Car Parking Finder** (v1): car parks and street parking near a destination, chance of a spot for your arrival time, check-ins and photo reports |
+| `apps/car-parking/` | **Park for Free** (v2, was Car Parking Finder): “Can I park here for free?”, free/paid rules for your arrival time and stay, chance of a space, best time to arrive, check-ins and sign photos |
 | `shared/` | Shared styles, map helpers and a bundled copy of Leaflet (the map library) |
 
 It's all plain HTML and JavaScript. No install and no build step.
