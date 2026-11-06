@@ -20,7 +20,7 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   lessons, two checks (`ideas-js-valid`, `app-files-exist`) and three skills (`je-tracker`, `je-static-app`,
   `je-supabase`). The kit itself (the SessionStart, Stop and PostToolUse hooks, its scripts, and the skills
   `reflect`, `curate`, `anthropic-sdk` and `supabase-rls`) is synced from hermod (kit 0.1.0, not yet released; the stamp
-  names the commit, now `df076b2`); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on Node 22,
+  names the commit, now `91f0244`); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on Node 22,
   only for Claude Code: the apps themselves still have no build step and no dependencies.
 
 ## Next step
@@ -56,8 +56,8 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   line, not a `{ path, why }` pair.
 
 ## Recent sessions
-- 2026-11-06: the Hermod kit synced from hermod (now at `df076b2`: hooks, scripts, `reflect`, `curate`,
-  `anthropic-sdk`, `supabase-rls`); `/code-review` fixes to both checks; validator and check self-test pass; no app
-  code changed.
+- 2026-11-06: the Hermod kit synced from hermod (now at `91f0244`: hooks, scripts, `reflect`, `curate`,
+  `anthropic-sdk`, `supabase-rls`); `/code-review` fixes to both checks (`/security-review` found nothing; both
+  results are in the pull request); validator and check self-test pass; no app code changed.
 - 2026-11-05: Hermod Part A installed (CLAUDE.md, this progress log, lessons, three skills, two checks); no app
   code changed.
