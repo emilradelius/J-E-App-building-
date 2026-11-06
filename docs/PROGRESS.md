@@ -20,7 +20,7 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   lessons, two checks (`ideas-js-valid`, `app-files-exist`) and three skills (`je-tracker`, `je-static-app`,
   `je-supabase`). The kit itself (the SessionStart, Stop and PostToolUse hooks, its scripts, and the skills
   `reflect`, `curate`, `anthropic-sdk` and `supabase-rls`) is synced from hermod (kit 0.1.0, not yet released; the stamp
-  names the commit, now `91f0244`); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on Node 22,
+  names the commit, now `2e8a99a`); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on Node 22,
   only for Claude Code: the apps themselves still have no build step and no dependencies.
 
 ## Next step
@@ -50,13 +50,13 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   checked.
 - After the sync: `node .claude/hermod/validate.mjs` passes (config, lessons, all seven skills), `node
   .claude/hermod/check.mjs --self-test` passes (every example of the two checks gives the expected result), and
-  `node .claude/hermod/brief.mjs` prints the brief (about 5,500 of 8,000 characters). The hooks were not tried in a
+  `node .claude/hermod/brief.mjs` prints the brief (about 5,900 of 8,000 characters). The hooks were not tried in a
   live Claude Code session here.
 - `ritual.remind` takes plain text in the kit's config schema, so the reminder about `data/ideas.js` is one text
   line, not a `{ path, why }` pair.
 
 ## Recent sessions
-- 2026-11-06: the Hermod kit synced from hermod (now at `91f0244`: hooks, scripts, `reflect`, `curate`,
+- 2026-11-06: the Hermod kit synced from hermod (now at `2e8a99a`: hooks, scripts, `reflect`, `curate`,
   `anthropic-sdk`, `supabase-rls`); `/code-review` fixes to both checks (`/security-review` found nothing; both
   results are in the pull request); validator and check self-test pass; no app code changed.
 - 2026-11-05: Hermod Part A installed (CLAUDE.md, this progress log, lessons, three skills, two checks); no app
