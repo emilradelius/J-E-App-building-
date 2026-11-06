@@ -4,7 +4,7 @@ How this file works: it is short on purpose, so a new session can read it whole.
 "Next step" in the brief at the start of every session. At the end of a session, update Status, Next step, Open
 questions and Not done, and add one line under Recent sessions; older detail lives in git history.
 
-## Status (2026-11-05)
+## Status (2026-11-06)
 - **App Tracker** (`index.html` + `data/ideas.js`): live. Seven ideas; two are being built (Truck Stop Map, Park
   for Free), one is this tracker.
 - **Truck Stop Map v0** (`apps/truck-stops/`): truck stops, rest areas, truck parking and truck fuel from
@@ -18,12 +18,15 @@ questions and Not done, and add one line under Recent sessions; older detail liv
 - No tests, no lint, no CI. Checks are by hand in a browser.
 - Hermod Part A is installed by this pull request: `CLAUDE.md`, this file, `.claude/hermod/config.json`, the
   lessons, two checks (`ideas-js-valid`, `app-files-exist`) and three skills (`je-tracker`, `je-static-app`,
-  `je-supabase`). The kit's hooks, scripts and own skills come from the hermod sync in a later commit.
+  `je-supabase`). The kit itself (the SessionStart, Stop and PostToolUse hooks, its scripts, and the skills
+  `reflect`, `curate`, `anthropic-sdk` and `supabase-rls`) is synced from hermod at commit `6821a88` (kit 0.1.0,
+  not yet released); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on Node 22,
+  only for Claude Code: the apps themselves still have no build step and no dependencies.
 
 ## Next step
 - The owners review and merge this pull request.
-- Then the hermod sync adds the kit files (`node scripts/sync.mjs --target <this repo> --ref <tag>` from a hermod
-  checkout), in its own pull request.
+- After hermod's pull request is merged and tagged `v0.1.0`, the kit is synced again at the tag
+  (`node scripts/sync.mjs --target <this repo> --ref v0.1.0` from a hermod checkout), in its own pull request.
 - App work continues from the `nextSteps` in `data/ideas.js`: test Park for Free v2 on real streets, add the
   Claude API key as an Edge Function secret so sign photos get read, and pick a truck-routing provider.
 
@@ -45,16 +48,15 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   come from `supabase/migrations/` and the code; whether the live project matches, whether the deployed
   `read-sign` matches the repo (and its `verify_jwt` setting), and whether `ANTHROPIC_API_KEY` is set were not
   checked.
-- The kit files (hooks, scripts, kit skills) are not in this commit. Until the sync adds them, the session brief,
-  `recall.mjs`, the check runner and `/reflect` do not run here.
-- Hermod's validator (`validate.mjs --strict`, from the unreleased kit on the hermod working branch) passed with no
-  errors or warnings: config, lessons and all three skills.
-- The kit's check runner did not exist yet, so `check.mjs --self-test` was not run. The two checks were run with a
-  stand-in harness instead: every example gives the expected result (with both plain and promise-returning reads),
-  both checks pass on the current repo, and both fail when a real file is broken or removed.
+- After the sync: `node .claude/hermod/validate.mjs` passes (config, lessons, all seven skills), `node
+  .claude/hermod/check.mjs --self-test` passes (every example of the two checks gives the expected result), and
+  `node .claude/hermod/brief.mjs` prints the brief (about 5,500 of 8,000 characters). The hooks were not tried in a
+  live Claude Code session here.
 - `ritual.remind` takes plain text in the kit's config schema, so the reminder about `data/ideas.js` is one text
   line, not a `{ path, why }` pair.
 
 ## Recent sessions
+- 2026-11-06: the Hermod kit synced from hermod `6821a88` (hooks, scripts, `reflect`, `curate`, `anthropic-sdk`,
+  `supabase-rls`); validator and check self-test pass; no app code changed.
 - 2026-11-05: Hermod Part A installed (CLAUDE.md, this progress log, lessons, three skills, two checks); no app
   code changed.
