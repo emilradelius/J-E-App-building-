@@ -1,8 +1,8 @@
 {
   "kit": "0.1.0",
-  "ref": "df076b23c6c5d53e3d13ad454c51fa1678873d10",
-  "commit": "df076b23c6c5d53e3d13ad454c51fa1678873d10",
-  "syncedAt": "2026-11-06T04:23:48.492Z",
+  "ref": "85eec58502a481a2d835d45a04be13e595f3e85a",
+  "commit": "85eec58502a481a2d835d45a04be13e595f3e85a",
+  "syncedAt": "2026-11-06T04:34:56.379Z",
   "skills": [
     "anthropic-sdk",
     "supabase-rls"
@@ -14,7 +14,7 @@
     ".claude/hermod/curator.mjs": "fc4da0267593b1b18b6c6c047b72e2bcfd883289267a0dafbe374b35a72fccec",
     ".claude/hermod/hooks/post-tool.mjs": "2dd845aa9b358d3c02eadef6cf7947af7fbfcb801d6dcf0195b976ec2e54b4d2",
     ".claude/hermod/hooks/session-start.mjs": "acbca20f118726935fa9a5310f838e2be5a00b300031a0e631011c742c1c4b41",
-    ".claude/hermod/hooks/stop.mjs": "3ce9cca927c195f4759b2deb59e9cfaf32f0fc2bad5902cd74446b78331527c2",
+    ".claude/hermod/hooks/stop.mjs": "b7b9662d26d657eb2f1e7121d30d5cd9dc7f396da0895b9a79305060f96b70e0",
     ".claude/hermod/lib/bm25.mjs": "3f095e9d8be0854acf09c81b759e0323809a89216e6a86ec66d6eb484ccb6f0e",
     ".claude/hermod/lib/brief.mjs": "dbab3da7f75e84f0152aafe996a12265b8e26a92f131686a1c4148c62dc4ff7a",
     ".claude/hermod/lib/checks.mjs": "32ecb195a97990be9e6c3b47e91484dd427c97ebb7c9573393829eb6ed141d26",
