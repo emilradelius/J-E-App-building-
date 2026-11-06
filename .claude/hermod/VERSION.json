@@ -1,8 +1,8 @@
 {
   "kit": "0.1.0",
-  "ref": "6821a88720e3d243eb7abc70216645e6c567a1f2",
-  "commit": "6821a88720e3d243eb7abc70216645e6c567a1f2",
-  "syncedAt": "2026-11-06T00:46:38.278Z",
+  "ref": "99acd1e3512850f6228d7279a38dc93b77d805fd",
+  "commit": "99acd1e3512850f6228d7279a38dc93b77d805fd",
+  "syncedAt": "2026-11-06T01:39:27.075Z",
   "skills": [
     "anthropic-sdk",
     "supabase-rls"
