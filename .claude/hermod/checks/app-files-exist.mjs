@@ -4,8 +4,8 @@
 // blank or broken page with no build error to warn anyone, so every local <script src> and <link href> of the
 // pages must point at a file in the repository, and never outside it.
 //
-// Pages checked: index.html and apps/*/index.html (listed with git when the runner offers it), plus every changed
-// .html file under apps/. External URLs (https:, //, data:) are skipped.
+// Pages checked: index.html and every apps/<id>/*.html tracked by git (so a removed shared/ script is caught even
+// when no page changed), plus every changed page. External URLs (https:, //, data:) are skipped.
 import path from 'node:path';
 
 const PAGE = /^(?:index\.html|apps\/[^/]+\/[^/]*\.html)$/;
@@ -43,9 +43,10 @@ function pages(ctx) {
   }
   try {
     if (typeof ctx.git === 'function') {
-      const out = ctx.git(['ls-files', '--', 'index.html', 'apps/*/index.html']);
-      if (typeof out === 'string') {
-        for (const line of out.split(/\r?\n/)) {
+      // ctx.git returns { ok, stdout, ... } and runs with literal pathspecs (no globs), so list apps/ and filter.
+      const out = ctx.git(['ls-files', '--', 'index.html', 'apps']);
+      if (out && out.ok === true && typeof out.stdout === 'string') {
+        for (const line of out.stdout.split(/\r?\n/)) {
           const rel = posix(line.trim());
           if (rel && PAGE.test(rel)) set.add(rel);
         }
@@ -71,7 +72,8 @@ function references(html) {
     const attrs = m[2];
     const name = m[1].toLowerCase() === 'script' ? 'src' : 'href';
     if (name === 'href' && !/\brel\s*=\s*["']?[^"'>]*\b(?:stylesheet|icon|manifest|preload|modulepreload)\b/i.test(attrs)) continue;
-    const a = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(attrs);
+    // Anchored on whitespace so data-src= or data-href= is not read as src= or href=.
+    const a = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(attrs);
     if (!a) continue;
     const value = (a[1] ?? a[2] ?? a[3] ?? '').trim();
     if (!value || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(value)) continue;
@@ -150,6 +152,18 @@ export default {
     return finish(texts);
   },
   examples: [
+    {
+      name: 'passes when data-src or data-href sits next to the real src or href',
+      ctx: {
+        changedFiles: ['apps/demo/index.html'],
+        files: {
+          'apps/demo/index.html': '<link data-href="nowhere.css" rel="stylesheet" href="style.css"><script data-src="lazy" src="app.js"></script>\n',
+          'apps/demo/app.js': '// app\n',
+          'apps/demo/style.css': '/* css */\n',
+        },
+      },
+      expect: true,
+    },
     {
       name: 'passes when an app page loads shared files that exist (Windows line endings)',
       ctx: {

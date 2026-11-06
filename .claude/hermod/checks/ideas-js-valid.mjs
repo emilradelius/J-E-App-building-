@@ -1,12 +1,12 @@
 // @ts-check
 // Lesson as a check: index.html renders the tracker from window.IDEAS, which data/ideas.js sets. A syntax error
-// or a wrong shape there leaves the page empty or wrong without any message, so this check runs the file the way
-// the page does and checks the shape the page reads.
+// or a wrong shape there leaves the page empty or wrong without any message, so this check reads the file and
+// checks the shape the page reads.
 //
-// The file is evaluated with node:vm in a fresh context that holds only { window: {} } (no require, no process,
-// no timers) and a 1 s timeout. node:vm is not a security boundary: it runs the repository's own committed file,
-// which is reviewed in a pull request like any other code.
-import vm from 'node:vm';
+// The file is never run. It is parsed as data: comments and `window.IDEAS = [ ... ];` holding only text in
+// quotes, numbers, true/false/null, lists and objects. Anything else (a call, a variable, a template string, an
+// expression) is reported as "not a plain data file". Running it, even in node:vm, would let a pull request run
+// code on the reviewer's machine when a session ends.
 
 const FILE = 'data/ideas.js';
 const STATUSES = ['idea', 'exploring', 'building', 'testing', 'live', 'parked'];
@@ -43,32 +43,159 @@ function isDay(v) {
   return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
 }
 
+const MAX_BYTES = 2_000_000;
+const MAX_DEPTH = 20;
+
 /**
- * Runs the file like the page does and returns window.IDEAS, or an error text.
+ * Parses `window.IDEAS = <literal>;` (with comments) without running anything.
+ * @param {string} src
+ * @returns {unknown}
+ */
+function parseData(src) {
+  let i = 0;
+  /** @param {string} why */
+  const fail = (why) => {
+    const line = src.slice(0, i).split('\n').length;
+    throw new SyntaxError(`${why} at line ${line}`);
+  };
+  const skip = () => {
+    for (;;) {
+      const c = src[i];
+      if (c === ' ' || c === '\t' || c === '\n' || c === '\r') i += 1;
+      else if (c === '/' && src[i + 1] === '/') {
+        const end = src.indexOf('\n', i);
+        i = end < 0 ? src.length : end;
+      } else if (c === '/' && src[i + 1] === '*') {
+        const end = src.indexOf('*/', i + 2);
+        if (end < 0) fail('a comment is not closed');
+        i = end + 2;
+      } else return;
+    }
+  };
+  /** @param {string} word */
+  const expect = (word) => {
+    skip();
+    if (!src.startsWith(word, i)) fail(`expected "${word}"`);
+    i += word.length;
+  };
+  /** @returns {string} */
+  const string = () => {
+    const quote = src[i];
+    i += 1;
+    let out = '';
+    for (;;) {
+      const c = src[i];
+      if (c === undefined || c === '\n') fail('a text in quotes is not closed');
+      if (c === quote) {
+        i += 1;
+        return out;
+      }
+      if (c === '\\') {
+        const e = src[i + 1];
+        const simple = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', '"': '"', "'": "'", '\\': '\\', '/': '/' };
+        if (e !== undefined && Object.hasOwn(simple, e)) {
+          out += simple[/** @type {keyof typeof simple} */ (e)];
+          i += 2;
+        } else if (e === 'u' && /^[0-9a-fA-F]{4}$/.test(src.slice(i + 2, i + 6))) {
+          out += String.fromCharCode(parseInt(src.slice(i + 2, i + 6), 16));
+          i += 6;
+        } else fail('an unknown escape in a text');
+      } else {
+        out += c;
+        i += 1;
+      }
+    }
+  };
+  /** @param {number} depth @returns {unknown} */
+  const value = (depth) => {
+    if (depth > MAX_DEPTH) fail('the data is nested too deeply');
+    skip();
+    const c = src[i];
+    if (c === '"' || c === "'") return string();
+    if (c === '[') {
+      i += 1;
+      /** @type {unknown[]} */
+      const list = [];
+      for (;;) {
+        skip();
+        if (src[i] === ']') {
+          i += 1;
+          return list;
+        }
+        list.push(value(depth + 1));
+        skip();
+        if (src[i] === ',') i += 1;
+        else if (src[i] !== ']') fail('expected "," or "]"');
+      }
+    }
+    if (c === '{') {
+      i += 1;
+      /** @type {Record<string, unknown>} */
+      const obj = {};
+      for (;;) {
+        skip();
+        if (src[i] === '}') {
+          i += 1;
+          return obj;
+        }
+        let key;
+        if (src[i] === '"' || src[i] === "'") key = string();
+        else {
+          const m = /^[A-Za-z_$][\w$]*/.exec(src.slice(i, i + 200));
+          if (!m) fail('expected a property name');
+          key = /** @type {RegExpExecArray} */ (m)[0];
+          i += key.length;
+        }
+        expect(':');
+        // An own property even for "__proto__", so a key can never change the object's prototype.
+        Object.defineProperty(obj, key, { value: value(depth + 1), enumerable: true, writable: true, configurable: true });
+        skip();
+        if (src[i] === ',') i += 1;
+        else if (src[i] !== '}') fail('expected "," or "}"');
+      }
+    }
+    const num = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(src.slice(i, i + 40));
+    if (num) {
+      i += num[0].length;
+      return Number(num[0]);
+    }
+    for (const [word, v] of /** @type {Array<[string, unknown]>} */ ([['true', true], ['false', false], ['null', null]])) {
+      if (src.startsWith(word, i) && !/[\w$]/.test(src[i + word.length] ?? '')) {
+        i += word.length;
+        return v;
+      }
+    }
+    return fail('only text in quotes, numbers, true/false/null, lists and objects are allowed');
+  };
+  expect('window');
+  expect('.');
+  expect('IDEAS');
+  expect('=');
+  const ideas = value(0);
+  skip();
+  if (src[i] === ';') i += 1;
+  skip();
+  if (i < src.length) fail('unexpected text after window.IDEAS = [...]');
+  return ideas;
+}
+
+/**
+ * Reads window.IDEAS from the file without running it, or returns an error text.
  * @param {string} text
  * @returns {{ ideas?: unknown, error?: string }}
  */
 function evaluate(text) {
-  const sandbox = { window: /** @type {Record<string, unknown>} */ ({}) };
+  if (text.length > MAX_BYTES) return { error: `${FILE} is larger than ${MAX_BYTES} characters` };
   try {
-    const script = new vm.Script(text.replace(/^﻿/, ''), { filename: FILE });
-    script.runInContext(vm.createContext(sandbox), { timeout: 1000 });
+    return { ideas: parseData(text.replace(/^\uFEFF/, '')) };
   } catch (e) {
-    const err = /** @type {Error} */ (e);
-    const where = String(err && err.stack ? err.stack : '').split('\n')[0];
-    const at = /^data\/ideas\.js:\d+/.test(where) ? ` at ${where}` : '';
-    const why = err && err.message ? err.message : String(e);
-    if (err && err.name === 'SyntaxError') {
-      return { error: `${FILE} is not a plain script${at}: ${why}. The tracker page would show no ideas` };
-    }
+    const why = e instanceof Error ? e.message : String(e);
     return {
       error:
-        `${FILE} failed when run${at}: ${why}. It may only assign window.IDEAS = [...]; ` +
-        'the check runs it with nothing but window (no timers, no other globals)',
+        `${FILE} is not a plain data file (${why}). It may hold only comments and window.IDEAS = [ ... ]; with ` +
+        'text in quotes, numbers, true/false/null, lists and objects. The tracker page would show no ideas',
     };
   }
-  if (!('IDEAS' in sandbox.window)) return { error: `${FILE} does not set window.IDEAS` };
-  return { ideas: sandbox.window.IDEAS };
 }
 
 /**
@@ -168,6 +295,14 @@ export default {
     return verdict(text);
   },
   examples: [
+    {
+      name: 'fails, without running it, on code that reaches outside the data',
+      ctx: {
+        changedFiles: ['data/ideas.js'],
+        files: { 'data/ideas.js': "window.IDEAS = window.constructor.constructor('return process')().exit(1);\n" },
+      },
+      expect: false,
+    },
     {
       name: 'passes for a valid list with Windows line endings',
       ctx: {
