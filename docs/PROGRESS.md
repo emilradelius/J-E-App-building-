@@ -4,7 +4,7 @@ How this file works: it is short on purpose, so a new session can read it whole.
 "Next step" in the brief at the start of every session. At the end of a session, update Status, Next step, Open
 questions and Not done, and add one line under Recent sessions; older detail lives in git history.
 
-## Status (2026-11-06)
+## Status (2026-11-09)
 - **App Tracker** (`index.html` + `data/ideas.js`): live. Seven ideas; two are being built (Truck Stop Map, Park
   for Free), one is this tracker.
 - **Truck Stop Map v0** (`apps/truck-stops/`): truck stops, rest areas, truck parking and truck fuel from
@@ -16,17 +16,17 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   (`parking_reports`, `parking_checkins`, bucket `report-photos`), and the `read-sign` Edge Function that reads
   sign photos with Claude (it needs the secret `ANTHROPIC_API_KEY`).
 - No tests, no lint, no CI. Checks are by hand in a browser.
-- Hermod Part A is installed by this pull request: `CLAUDE.md`, this file, `.claude/hermod/config.json`, the
+- Hermod Part A is installed (#7, merged 2026-11-09): `CLAUDE.md`, this file, `.claude/hermod/config.json`, the
   lessons, two checks (`ideas-js-valid`, `app-files-exist`) and three skills (`je-tracker`, `je-static-app`,
   `je-supabase`). The kit itself (the SessionStart, Stop and PostToolUse hooks, its scripts, and the skills
-  `reflect`, `curate`, `anthropic-sdk` and `supabase-rls`) is synced from hermod (kit 0.1.0, not yet released; the stamp
-  names the commit, now `2e8a99a`); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on Node 22,
-  only for Claude Code: the apps themselves still have no build step and no dependencies.
+  `reflect`, `curate`, `anthropic-sdk` and `supabase-rls`) is synced from hermod (kit 0.1.0; the stamp
+  names the commit, now `32589df`); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on
+  Node 22, only for Claude Code: the apps themselves still have no build step and no dependencies.
 
 ## Next step
-- The owners review and merge this pull request.
-- After hermod's pull request is merged and tagged `v0.1.0`, the kit is synced again at the tag
-  (`node scripts/sync.mjs --target <this repo> --ref v0.1.0` from a hermod checkout), in its own pull request.
+- The kit is merged (#7, 2026-11-09) and pinned to hermod's released 0.1.0 (`32589df`). A later kit update comes the
+  same way: `node scripts/sync.mjs --target <this repo> --ref <tag or full sha>` from a hermod checkout, in its own
+  pull request.
 - App work continues from the `nextSteps` in `data/ideas.js`: test Park for Free v2 on real streets, add the
   Claude API key as an Edge Function secret so sign photos get read, and pick a truck-routing provider.
 
@@ -56,6 +56,7 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   line, not a `{ path, why }` pair.
 
 ## Recent sessions
+- 2026-11-09: #7 merged; the kit pinned to hermod's released 0.1.0 (`32589df`); no app code changed.
 - 2026-11-06: the Hermod kit synced from hermod (now at `2e8a99a`: hooks, scripts, `reflect`, `curate`,
   `anthropic-sdk`, `supabase-rls`); `/code-review` fixes to both checks (`/security-review` found nothing; both
   results are in the pull request); validator and check self-test pass; no app code changed.
