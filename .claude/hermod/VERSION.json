@@ -1,8 +1,8 @@
 {
-  "kit": "0.3.0",
-  "ref": "2143d5c0b4462e4a61d7f1347a59a65822eeeb1c",
-  "commit": "2143d5c0b4462e4a61d7f1347a59a65822eeeb1c",
-  "syncedAt": "2026-11-11T07:43:24.267Z",
+  "kit": "0.3.1",
+  "ref": "ca5d67956af84f02d17fe4e617692f4904c4e9a2",
+  "commit": "ca5d67956af84f02d17fe4e617692f4904c4e9a2",
+  "syncedAt": "2026-11-11T15:45:18.643Z",
   "skills": [
     "anthropic-sdk",
     "supabase-rls"
@@ -32,7 +32,7 @@
     ".claude/hermod/lib/state.mjs": "4bc85df68e3b135ac9e539296086dd9f76f22af6a0427aa16aad2bb56b53ce74",
     ".claude/hermod/lib/summary.mjs": "e991f6fc5235b7964c1f72af520ed89a3a1340149da34b2448e06ba5778dee76",
     ".claude/hermod/lib/transcript.mjs": "d3cb505ef951e9a4ace71f528e45f380567c19843e1895e7d47762f01b372a09",
-    ".claude/hermod/lib/travel.mjs": "63937c01adc92fd71d895a8db64bf2726e2f4a4b1303e9825da38de75c06c930",
+    ".claude/hermod/lib/travel.mjs": "4110c3f8fc918ed6b1d0ccf1de50553332500f06fd6c9ec1637bba95cb0ef937",
     ".claude/hermod/lib/usage.mjs": "115fab378719ef54450b0fd21ae40b9563b0bbef11985ab9300e18ce1e5a7972",
     ".claude/hermod/recall.mjs": "52465367d93a21a96bade833bc4d9a596666890065775c9ca38cc8fe1ebaa7d8",
     ".claude/hermod/reflect-prep.mjs": "e41170004769422b7f27e56221e31e3ea1518b763cf0f2d7dd8b3a56bd1caa39",
