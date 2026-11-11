@@ -19,13 +19,13 @@ questions and Not done, and add one line under Recent sessions; older detail liv
 - Hermod Part A is installed (#7, merged 2026-11-09): `CLAUDE.md`, this file, `.claude/hermod/config.json`, the
   lessons, two checks (`ideas-js-valid`, `app-files-exist`) and three skills (`je-tracker`, `je-static-app`,
   `je-supabase`). The kit itself (the SessionStart, Stop and PostToolUse hooks, its scripts, and the skills
-  `reflect`, `curate`, `anthropic-sdk` and `supabase-rls`) is synced from hermod (kit 0.1.0; the stamp
-  names the commit, now `32589df`); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on
+  `reflect`, `curate`, `anthropic-sdk` and `supabase-rls`) is synced from hermod (kit 0.3.0; the stamp
+  names the commit, now `2143d5c`); `.claude/hermod/VERSION.json` lists every kit file with its hash. The kit runs on
   Node 22, only for Claude Code: the apps themselves still have no build step and no dependencies.
 
 ## Next step
-- The kit is merged (#7, 2026-11-09) and pinned to hermod's released 0.1.0 (`32589df`). A later kit update comes the
-  same way: `node scripts/sync.mjs --target <this repo> --ref <tag or full sha>` from a hermod checkout, in its own
+- The kit is at hermod 0.3.0 (`2143d5c`). This repository is public, so Hermod's state stays on each device here:
+  it never opts in to committing session summaries or a graph. A later kit update comes the same way: `node scripts/sync.mjs --target <this repo> --ref <tag or full sha>` from a hermod checkout, in its own
   pull request.
 - App work continues from the `nextSteps` in `data/ideas.js`: test Park for Free v2 on real streets, add the
   Claude API key as an Edge Function secret so sign photos get read, and pick a truck-routing provider.
@@ -56,6 +56,8 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   line, not a `{ path, why }` pair.
 
 ## Recent sessions
+- 2026-11-11: the Hermod kit synced to 0.3.0 (`2143d5c`), with the seeded checks `hermod-state` and
+  `graphify-private`; this public repository keeps its state local. No app code changed.
 - 2026-11-09: #7 merged; the kit pinned to hermod's released 0.1.0 (`32589df`); no app code changed.
 - 2026-11-06: the Hermod kit synced from hermod (now at `2e8a99a`: hooks, scripts, `reflect`, `curate`,
   `anthropic-sdk`, `supabase-rls`); `/code-review` fixes to both checks (`/security-review` found nothing; both
