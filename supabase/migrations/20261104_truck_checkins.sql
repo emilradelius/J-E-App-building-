@@ -1,5 +1,5 @@
--- NOT YET APPLIED to Supabase project "je-apps" (ugageqklogrispkncrnp): it was waiting for
--- approval on 2026-11-04. Until it is, check-ins are saved as normal reports (the app falls back).
+-- Applied to Supabase project "je-apps" (ugageqklogrispkncrnp) on 2026-11-24 (Emil: "you do it"). Until then
+-- check-ins were saved as normal reports (the app falls back).
 -- Check-ins: a driver taps "I'm parked here", the phone's GPS confirms they are
 -- within 500 m of the stop, and they say how full it is. We store only the
 -- distance to the stop (not the driver's position).
