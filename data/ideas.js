@@ -72,6 +72,7 @@ window.IDEAS = [
       "Show it to 5–10 truck drivers: would they use it instead of what they have?",
     ],
     log: [
+      { date: "2026-11-24", who: "Claude", text: "GPS check-ins switched on: the check-in database change is applied (Emil: \"you do it\"). The truck tables now let the public key only read and add (they had every right by default); checked." },
       { date: "2026-11-04", who: "Claude", text: "Norway data (NVDB: 643 places) + GPS check-in button. The check-in database change is waiting for approval." },
       { date: "2026-11-04", who: "Claude", text: "Data: shared reports on, collector + schedule, 1,825 German truck sites imported, planned stops + fullness history. Source list in docs/research/truck-data-sources.md." },
       { date: "2026-11-04", who: "Claude", text: "Built the Break Planner: truck route + EU breaks/rests placed at real stops, chance of a space, driver reports. Old map moved to 'Truck stops near me'." },

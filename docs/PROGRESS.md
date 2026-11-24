@@ -56,6 +56,9 @@ questions and Not done, and add one line under Recent sessions; older detail liv
   line, not a `{ path, why }` pair.
 
 ## Recent sessions
+- 2026-11-24: the truck check-in migration applied to je-apps (Emil: "you do it"); the truck tables' rights narrowed to
+  read and add for the public key (they had Supabase's default every right; migration `20261124_truck_grants_read_add_only`).
+  Checked as the public role in rolled-back blocks; the advisors show no new finding. Not tried in the app on a phone.
 - 2026-11-11: the Hermod kit synced to 0.3.1 (`ca5d679`), with the seeded checks `hermod-state` and
   `graphify-private`; this public repository keeps its state local. No app code changed.
 - 2026-11-09: #7 merged; the kit pinned to hermod's released 0.1.0 (`32589df`); no app code changed.
