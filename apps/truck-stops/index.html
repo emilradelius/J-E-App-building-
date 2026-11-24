@@ -3,49 +3,127 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Truck Stop Map</title>
+  <title>Truck Break Planner</title>
   <link rel="stylesheet" href="../../shared/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="../../shared/style.css" />
+  <style>
+    .map-app .panel { overflow-y: auto; }
+    .map-app .panel-head { border-bottom: none; }
+    details.card-box > summary { cursor: pointer; font-weight: 600; list-style: none; }
+    details.card-box > summary::-webkit-details-marker { display: none; }
+    details.card-box > summary::after { content: " ▸"; color: var(--muted); }
+    details.card-box[open] > summary::after { content: " ▾"; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+    .grid2 label, .field { display: grid; gap: 2px; font-size: 13px; color: var(--muted); }
+    .grid2 input, .grid2 select { width: 100%; }
+    .check { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+    .timeline { padding: 0 16px 16px; display: grid; gap: 10px; }
+    .stop {
+      border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+      display: grid; gap: 4px; background: var(--surface);
+    }
+    .stop.rest { border-left: 4px solid #7b4fd6; }
+    .stop.break { border-left: 4px solid var(--warn); }
+    .stop.endpoint { border-left: 4px solid var(--accent); }
+    .stop .when { font-weight: 700; }
+    .stop .where { font-weight: 600; }
+    .stop .meta { font-size: 13px; color: var(--muted); }
+    .badge { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+    .badge.Good { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+    .badge.OK { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+    .badge.Low { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+    .alts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .alts button, .report button { font-size: 12px; padding: 3px 8px; }
+    .alts button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    .card-box.error, .error { color: var(--bad); }
+    .report { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+    .summary { padding: 0 16px; display: grid; gap: 6px; }
+    .warn { color: var(--warn); font-size: 13px; }
+    .num-icon {
+      display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+      color: #fff; font: 700 13px system-ui; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.4);
+    }
+  </style>
 </head>
 <body>
   <div class="map-app">
     <aside class="panel">
       <div class="panel-head">
         <div class="title-row">
-          <h1>Truck Stop Map</h1>
+          <h1>Truck Break Planner</h1>
           <a class="back" href="../../">← All apps</a>
         </div>
+        <div class="muted small">Enter your trip and how long you've driven. We place your EU breaks and daily rest on the route and pick truck stops where you're likely to find a space.</div>
 
-        <form class="row" id="searchForm">
-          <input type="search" id="place" placeholder="Go to a place (e.g. Jönköping)" aria-label="Place" />
-          <button type="submit">Go</button>
-          <button type="button" id="locate" title="Use my location">📍</button>
+        <button type="button" id="checkin" title="Uses your GPS to confirm you're at a truck stop">📍 Check in where I'm parked</button>
+        <div id="checkinBox"></div>
+
+        <form id="tripForm" class="card-box" autocomplete="off">
+          <div class="row">
+            <input type="search" id="from" placeholder="From (e.g. Malmö)" aria-label="From" style="flex:1" />
+            <button type="button" id="locate" title="Use my location">📍</button>
+          </div>
+          <input type="search" id="to" placeholder="To (e.g. Stockholm)" aria-label="To" />
+          <label class="field">Leaving at <input type="datetime-local" id="depart" /></label>
+          <button class="primary" id="go" type="submit">Plan my breaks</button>
         </form>
 
-        <button class="primary" id="find">Find truck stops in this area</button>
-
-        <div class="chips" id="filters"></div>
-
-        <div class="card-box">
-          <b>Break planner</b>
-          <div class="row small">
-            <label>Driving since <input type="time" id="since" /></label>
-            <label>Avg speed <input type="number" id="speed" value="75" min="20" max="100" style="width:64px" /> km/h</label>
+        <details class="card-box" id="driverBox" open>
+          <summary>My driving time so far</summary>
+          <div class="grid2">
+            <label>Driven since last break <input type="time" id="sinceBreak" value="00:00" /></label>
+            <label>Driven today <input type="time" id="today" value="00:00" /></label>
+            <label>10 h days used this week
+              <select id="extendedUsed"><option>0</option><option>1</option><option>2</option></select></label>
+            <label>Short (9 h) rests used
+              <select id="reducedUsed"><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
+            <label>Driven this week (h) <input type="number" id="week" value="0" min="0" max="60" step="0.5" /></label>
           </div>
-          <div id="breakInfo" class="small"></div>
-          <label class="small row"><input type="checkbox" id="showRange" checked /> Show how far I can drive before the break</label>
-          <div class="muted small">EU rule: 45 min break after 4 h 30 min of driving (can be split 15 + 30). Max 9 h driving per day (10 h twice a week).</div>
-        </div>
+          <label class="check"><input type="checkbox" id="firstPart" /> I already took a 15 min break (so the next one is 30 min)</label>
+          <label class="check"><input type="checkbox" id="allowExtended" checked /> Allow a 10 h driving day if I have one left</label>
+          <label class="check"><input type="checkbox" id="preferReduced" /> Use a short 9 h night rest if I have one left</label>
+          <div class="muted small">Tip: read these from your tachograph. Times are h:mm.</div>
+        </details>
 
-        <div class="status" id="status">Zoom to an area and press “Find truck stops”.</div>
+        <details class="card-box" id="truckBox">
+          <summary>My truck</summary>
+          <div class="grid2">
+            <label>Height (m) <input type="number" id="height" value="4.0" step="0.05" min="2" max="5" /></label>
+            <label>Width (m) <input type="number" id="width" value="2.55" step="0.05" min="2" max="3.5" /></label>
+            <label>Length (m) <input type="number" id="length" value="18.75" step="0.25" min="5" max="34" /></label>
+            <label>Total weight (t) <input type="number" id="weight" value="40" step="1" min="3.5" max="74" /></label>
+            <label>Axle load (t) <input type="number" id="axleLoad" value="10" step="0.5" min="1" max="15" /></label>
+          </div>
+          <label class="check"><input type="checkbox" id="hazmat" /> Dangerous goods (ADR)</label>
+        </details>
+
+        <details class="card-box" id="wantBox" open>
+          <summary>At my stops I want</summary>
+          <div class="chips" id="wants"></div>
+        </details>
+
+        <div class="status" id="status"></div>
       </div>
-      <div class="list" id="list"></div>
+
+      <div class="summary" id="summary"></div>
+      <div class="timeline" id="timeline"></div>
+      <div class="muted small" style="padding:0 16px 16px">
+        Routes: OpenStreetMap (Valhalla truck routing, no live traffic). Stops: OpenStreetMap, Autobahn GmbH (Germany), Statens vegvesen NVDB (Norway).
+        “Chance of a space” is an estimate from the time of day and driver reports. Always follow road signs and your tachograph.
+        · <a href="nearby.html">Truck stops near me</a>
+      </div>
     </aside>
     <div class="map-wrap"><div id="map"></div></div>
   </div>
 
   <script src="../../shared/vendor/leaflet/leaflet.js"></script>
   <script src="../../shared/map-utils.js"></script>
-  <script src="app.js"></script>
+  <script src="../../shared/supabase-config.js"></script>
+  <script src="rules.js"></script>
+  <script src="route.js"></script>
+  <script src="stops.js"></script>
+  <script src="reports.js"></script>
+  <script src="plan.js"></script>
+  <script src="checkin.js"></script>
 </body>
 </html>
